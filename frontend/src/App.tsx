@@ -67,8 +67,17 @@ function App() {
   const [telemetry, setTelemetry] = useState({ pvLeistung: 0, netzzustand: 0 });
 
 
-  const [priceSurcharge, setPriceSurcharge] = useState<number>(0);
+  const [priceSurcharge, setPriceSurcharge] = useState<number>(() => {
+    const saved = localStorage.getItem('sunshift_price_surcharge');
+    return saved ? parseFloat(saved) : 0;
+  });
+  
+  useEffect(() => {
+    localStorage.setItem('sunshift_price_surcharge', priceSurcharge.toString());
+  }, [priceSurcharge]);
+
   const [visibleDatasets, setVisibleDatasets] = useState<string[]>(['price', 'pv', 'washer', 'dryer', 'dishwasher']);
+
 
   const chartRef = useRef<any>(null);
 
@@ -782,28 +791,30 @@ function App() {
             )}
           </div>
 
-          <div className="surcharge-config" style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
-            <h3 style={{ fontSize: '1rem', color: '#94a3b8', marginBottom: '0.5rem' }}>Steuern & Umlagen (Cent/kWh):</h3>
+          <div className="surcharge-config" style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(0,0,0,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1rem', color: '#475569', marginBottom: '0.5rem' }}>Steuern & Umlagen (Cent/kWh):</h3>
             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
               <input 
                 type="number" 
-                value={priceSurcharge} 
-                onChange={(e) => setPriceSurcharge(parseFloat(e.target.value) || 0)} 
+                value={priceSurcharge || ''} 
+                onChange={(e) => setPriceSurcharge(e.target.value === '' ? 0 : parseFloat(e.target.value))} 
                 style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  color: '#f1f5f9',
-                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: '#ffffff',
+                  color: '#0f172a',
+                  border: '1px solid #cbd5e1',
                   padding: '0.5rem 1rem',
                   borderRadius: '0.5rem',
                   fontSize: '0.95rem',
-                  width: '120px'
+                  width: '120px',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.05)',
+                  fontWeight: 600
                 }} 
                 placeholder="0.00"
                 step="0.1"
               />
-              <span style={{ color: '#64748b', fontSize: '0.95rem' }}>Cent/kWh werden auf den Börsenpreis addiert.</span>
             </div>
           </div>
+
 
           {isMieleConnected && spineDevices.length > 0 && (
 
