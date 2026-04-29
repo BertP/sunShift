@@ -437,32 +437,31 @@ function App() {
 
   const currentTimeLine = {
     id: 'currentTimeLine',
-    beforeDraw: (chart: any) => {
-      if (!prices.length) return;
+    afterDraw: (chart: any) => {
       const ctx = chart.ctx;
       const xAxis = chart.scales.x;
       const yAxis = chart.scales.y;
       
       const now = new Date();
-      const firstPriceTime = new Date(prices[0].timestamp);
-      const totalSpanMs = 24 * 60 * 60 * 1000;
-      const elapsedMs = now.getTime() - firstPriceTime.getTime();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const index = hours * 4 + (minutes / 15);
+      const xPos = xAxis.getPixelForValue(index);
       
-      if (elapsedMs < 0 || elapsedMs > totalSpanMs) return;
-      
-      const xPos = xAxis.left + (xAxis.width * (elapsedMs / totalSpanMs));
+      if (xPos < xAxis.left || xPos > xAxis.right) return;
       
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(xPos, yAxis.top);
       ctx.lineTo(xPos, yAxis.bottom);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)'; // Vibrant Red
-      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#ef4444'; 
+      ctx.setLineDash([6, 4]);
       ctx.stroke();
       ctx.restore();
     }
   };
+
 
   const chartOptions = {
     responsive: true,
