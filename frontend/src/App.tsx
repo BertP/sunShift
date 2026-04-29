@@ -16,7 +16,10 @@ import {
 import { Chart as ChartJS, registerables } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 
+import packageJson from '../package.json';
+
 ChartJS.register(...registerables);
+
 
 interface PriceData {
   timestamp: string;
@@ -1176,7 +1179,8 @@ function App() {
       </main>
 
       <footer className="glass-footer">
-        <p>&copy; 2026 SunShift EMS | Smart Energy. Perfect Timing. | v0.4</p>
+        <p>&copy; 2026 SunShift EMS | Smart Energy. Perfect Timing. | v{packageJson.version}</p>
+
       </footer>
       {isLogsDetached && viewMode === 'developer' && (
         <>
