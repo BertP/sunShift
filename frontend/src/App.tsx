@@ -365,10 +365,11 @@ function App() {
         type: 'bar' as const,
         label: 'Electricity Price (Cent/kWh)',
         data: expandedPrices,
-        borderColor: '#38bdf8',
-        backgroundColor: 'rgba(56, 189, 248, 0.6)',
+        borderColor: '#a78bfa',
+        backgroundColor: 'rgba(167, 139, 250, 0.6)',
         borderWidth: 1,
         yAxisID: 'y',
+
       },
       {
         type: 'line' as const,
