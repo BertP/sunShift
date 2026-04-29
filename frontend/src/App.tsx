@@ -67,7 +67,11 @@ function App() {
   const [telemetry, setTelemetry] = useState({ pvLeistung: 0, netzzustand: 0 });
 
 
+  const [priceSurcharge, setPriceSurcharge] = useState<number>(0);
+  const [visibleDatasets, setVisibleDatasets] = useState<string[]>(['price', 'pv', 'washer', 'dryer', 'dishwasher']);
+
   const chartRef = useRef<any>(null);
+
 
   const [apiLogs, setApiLogs] = useState<any[]>([]);
   const [isLogsDetached, setIsLogsDetached] = useState(false);
@@ -345,7 +349,8 @@ function App() {
     for (let chunk = 0; chunk < 4; chunk++) {
       const chunkTime = new Date(baseTime.getTime() + chunk * 15 * 60 * 1000);
       expandedLabels.push(chunkTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      expandedPrices.push(p.price);
+      expandedPrices.push(p.price + priceSurcharge);
+
       
       // Linear chunk interpolation
       const chunkVal = currentSolar + ((nextSolar - currentSolar) * (chunk / 4));
@@ -361,7 +366,7 @@ function App() {
   const chartData = {
     labels: expandedLabels.length ? expandedLabels : ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
     datasets: [
-      {
+      ...(visibleDatasets.includes('price') ? [{
         type: 'bar' as const,
         label: 'Electricity Price (Cent/kWh)',
         data: expandedPrices,
@@ -369,9 +374,8 @@ function App() {
         backgroundColor: 'rgba(167, 139, 250, 0.6)',
         borderWidth: 1,
         yAxisID: 'y',
-
-      },
-      {
+      }] : []),
+      ...(visibleDatasets.includes('pv') ? [{
         type: 'line' as const,
         label: 'PV Forecast (W)',
         data: expandedSolar.length ? expandedSolar : [0,0,0,0,0,0],
@@ -383,8 +387,8 @@ function App() {
         yAxisID: 'y1',
         pointRadius: 0,
         pointHitRadius: 10,
-      },
-      {
+      }] : []),
+      ...(visibleDatasets.includes('washer') ? [{
         type: 'bar' as const,
         label: 'Washer Forecast (W)',
         data: washerPower,
@@ -393,8 +397,8 @@ function App() {
         borderWidth: 1,
         yAxisID: 'y1',
         stack: 'appliances',
-      },
-      {
+      }] : []),
+      ...(visibleDatasets.includes('dryer') ? [{
         type: 'bar' as const,
         label: 'Dryer Forecast (W)',
         data: dryerPower,
@@ -403,8 +407,8 @@ function App() {
         borderWidth: 1,
         yAxisID: 'y1',
         stack: 'appliances',
-      },
-      {
+      }] : []),
+      ...(visibleDatasets.includes('dishwasher') ? [{
         type: 'bar' as const,
         label: 'Dishwasher Forecast (W)',
         data: dishwasherPower,
@@ -413,10 +417,10 @@ function App() {
         borderWidth: 1,
         yAxisID: 'y1',
         stack: 'appliances',
-      }
-
+      }] : [])
     ]
   };
+
 
   const ganttLayoutSync = {
     id: 'ganttLayoutSync',
@@ -462,15 +466,18 @@ function App() {
 
   const chartOptions = {
     responsive: true,
-
     maintainAspectRatio: false,
+    barPercentage: 0.95,
+    categoryPercentage: 0.95,
+
     interaction: {
       mode: 'index' as const,
       intersect: false,
     },
     plugins: {
       legend: {
-        position: 'top' as const,
+        display: false,
+
         labels: { 
           color: '#0f172a',
           font: {
@@ -776,7 +783,31 @@ function App() {
             )}
           </div>
 
+          <div className="surcharge-config" style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1.5rem', marginBottom: '1.5rem' }}>
+            <h3 style={{ fontSize: '1rem', color: '#94a3b8', marginBottom: '0.5rem' }}>Steuern & Umlagen (Cent/kWh):</h3>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input 
+                type="number" 
+                value={priceSurcharge} 
+                onChange={(e) => setPriceSurcharge(parseFloat(e.target.value) || 0)} 
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  color: '#f1f5f9',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  fontSize: '0.95rem',
+                  width: '120px'
+                }} 
+                placeholder="0.00"
+                step="0.1"
+              />
+              <span style={{ color: '#64748b', fontSize: '0.95rem' }}>Cent/kWh werden auf den Börsenpreis addiert.</span>
+            </div>
+          </div>
+
           {isMieleConnected && spineDevices.length > 0 && (
+
             <div className="compact-device-list" style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>Found Appliances:</h3>
               {spineDevices.map(device => {
@@ -857,6 +888,48 @@ function App() {
 
         <section className="glass-card chart-card">
           <h2>Energy & Price Forecast for {prices.length ? new Date(prices[0].timestamp).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'}) : new Date().toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'})} {lastUpdated && `(last Update: ${lastUpdated})`}</h2>
+          
+          <div className="chart-filter-selector" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem', justifyContent: 'center' }}>
+            {[
+              { id: 'price', label: 'Electricity Price', color: '#a78bfa' },
+              { id: 'pv', label: 'PV Forecast', color: '#fbbf24' },
+              { id: 'washer', label: 'Washer Forecast', color: 'rgba(34, 197, 94, 0.8)' },
+              { id: 'dryer', label: 'Dryer Forecast', color: 'rgba(56, 189, 248, 0.8)' },
+              { id: 'dishwasher', label: 'Dishwasher Forecast', color: 'rgba(249, 115, 22, 0.8)' }
+            ].map(filter => {
+              const isActive = visibleDatasets.includes(filter.id);
+              return (
+                <button
+                  key={filter.id}
+                  onClick={() => {
+                    if (isActive) {
+                      setVisibleDatasets(visibleDatasets.filter(x => x !== filter.id));
+                    } else {
+                      setVisibleDatasets([...visibleDatasets, filter.id]);
+                    }
+                  }}
+                  style={{
+                    background: isActive ? filter.color : 'rgba(255,255,255,0.05)',
+                    color: isActive ? '#0f172a' : '#94a3b8',
+                    border: `1px solid ${filter.color}`,
+                    padding: '0.4rem 1rem',
+                    borderRadius: '2rem',
+                    fontSize: '0.85rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem'
+                  }}
+                >
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: isActive ? '#0f172a' : filter.color }} />
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="chart-wrapper">
             <Bar ref={chartRef} data={chartData as any} options={chartOptions} plugins={[ganttLayoutSync, currentTimeLine]} />
 
