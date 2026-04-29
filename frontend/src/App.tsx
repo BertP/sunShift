@@ -460,9 +460,10 @@ function App() {
       const firstPriceTime = new Date(prices[0].timestamp);
       const elapsedMs = now.getTime() - firstPriceTime.getTime();
       const index = elapsedMs / (1000 * 60 * 15);
-      const xPos = xAxis.getPixelForValue(index);
+      const xPos = xAxis.left + (xAxis.width * (index / 96));
       
       if (xPos < xAxis.left || xPos > xAxis.right) return;
+
 
       
       ctx.save();
@@ -1267,9 +1268,65 @@ function App() {
             </div>
           </div>
 
+          {/* Callback Log Window */}
+          <div 
+            style={{ 
+              position: 'fixed', 
+              left: `${logPos.x - 420}px`, 
+              top: `${logPos.y}px`, 
+              width: '400px', 
+              height: '500px',
+              background: 'rgba(15, 23, 42, 0.95)', 
+              backdropFilter: 'blur(12px)', 
+              color: '#f1f5f9', 
+              border: '1px solid rgba(34, 197, 94, 0.3)', 
+              borderRadius: '0.75rem', 
+              padding: '1rem', 
+              boxShadow: '0 10px 25px rgba(0,0,0,0.5)', 
+              zIndex: 9997, 
+              display: 'flex', 
+              flexDirection: 'column',
+              resize: 'both',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%', display: 'inline-block' }}></span>
+                <h3 style={{ fontSize: '1rem', color: '#f1f5f9', margin: 0 }}>SPINE Webhook Callbacks</h3>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+              {apiLogs.filter(log => log.endpoint === '/api/spine/callback').map(log => {
+                let payloadStr = log.response;
+                try {
+                  if (typeof log.response !== 'string') {
+                    payloadStr = JSON.stringify(log.response, null, 2);
+                  }
+                } catch (_) {}
+
+                return (
+                  <div key={log.id} style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#22c55e', fontWeight: 'bold', fontSize: '0.75rem' }}>
+                      <span>📥 Webhook Received</span>
+                      <span style={{ color: '#64748b' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                    </div>
+                    <pre style={{ whiteSpace: 'pre-wrap', color: '#94a3b8', margin: '0.25rem 0 0 0', fontSize: '0.75rem' }}>
+                      {payloadStr}
+                    </pre>
+                  </div>
+                );
+              })}
+              {apiLogs.filter(log => log.endpoint === '/api/spine/callback').length === 0 && (
+                <p style={{ color: '#64748b', textAlign: 'center', marginTop: '2rem' }}>Warte auf SPINE Callbacks...</p>
+              )}
+            </div>
+          </div>
+
           {/* API Activity Window */}
           <div 
             style={{ 
+
               position: 'fixed', 
               left: `${logPos.x}px`, 
               top: `${logPos.y}px`, 
