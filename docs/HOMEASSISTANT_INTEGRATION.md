@@ -7,13 +7,14 @@ Dieses Dokument beschreibt die Integration von Home Assistant zur Erfassung von 
 * Kontinuierliche Aktualisierung per WebSocket (`wss://home.never2sunny.eu/api/websocket`).
 
 ## 2. Aufgabenpaket & Implementierungsschritte
-- [ ] **Schritt 1: WebSocket-Client aufsetzen**
+- [x] **Schritt 1: WebSocket-Client aufsetzen**
   * Einbindung der `ws` Bibliothek im Backend.
-- [ ] **Schritt 2: Authentifizierung (MAuth)**
+- [x] **Schritt 2: Authentifizierung (MAuth)**
   * Senden des HA Long-Lived Access Tokens.
-- [ ] **Schritt 3: State Subscription**
+- [x] **Schritt 3: State Subscription**
   * Überwachung von:
     * `sensor.pv_power` (Aktuelle Solarerzeugung in W)
     * `sensor.grid_power` (Netzbezug/-einspeisung in W)
+
 - [ ] **Schritt 4: EMS Logic Hook**
   * Echtzeit-Triggerung des Reschedulings bei starken Leistungs-Fluktuationen.
