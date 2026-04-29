@@ -155,23 +155,9 @@ function App() {
       setSolar(response.data.solar);
       setDevices(response.data.devices);
       
-      const sequences: Record<string, any> = {};
-      const slots: Record<string, any> = {};
+      setPowerSequences({});
+      setPowerTimeSlots({});
 
-      for (const d of response.data.devices) {
-        try {
-          const seqRes = await axios.get(`/api/features/powerSequence?deviceId=${d.id}`);
-          sequences[d.id] = Array.isArray(seqRes.data) ? seqRes.data[0]?.data : (seqRes.data?.data || seqRes.data);
-          
-          const slotRes = await axios.get(`/api/features/powerTimeSlot?deviceId=${d.id}`);
-          slots[d.id] = Array.isArray(slotRes.data) ? slotRes.data[0]?.data : (slotRes.data?.data || slotRes.data);
-
-        } catch (e: any) {
-          console.error(`Failed to fetch profile for ${d.id}`, e);
-        }
-      }
-      setPowerSequences(sequences);
-      setPowerTimeSlots(slots);
 
       try {
         const runsRes = await axios.get('/api/executed-runs');
