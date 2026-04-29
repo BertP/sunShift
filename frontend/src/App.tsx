@@ -1309,7 +1309,7 @@ function App() {
           <div 
             style={{ 
               position: 'fixed', 
-              left: `${logPos.x - 420}px`, 
+              left: `${logPos.x}px`, 
               top: `${logPos.y}px`, 
               width: '400px', 
               height: '500px',
@@ -1327,12 +1327,30 @@ function App() {
               overflow: 'hidden'
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div 
+              style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center', 
+                paddingBottom: '0.75rem', 
+                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                cursor: 'move',
+                userSelect: 'none'
+              }}
+              onMouseDown={(e) => {
+                setDragging(true);
+                setRel({
+                  x: e.clientX - logPos.x,
+                  y: e.clientY - logPos.y
+                });
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%', display: 'inline-block' }}></span>
                 <h3 style={{ fontSize: '1rem', color: '#f1f5f9', margin: 0 }}>SPINE Webhook Callbacks</h3>
               </div>
             </div>
+
             <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0', fontFamily: 'monospace', fontSize: '0.8rem' }}>
               {apiLogs.filter(log => log.endpoint === '/api/spine/callback').map(log => {
                 let payloadStr = log.response;
