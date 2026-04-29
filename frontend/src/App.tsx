@@ -822,25 +822,8 @@ function App() {
       )}
 
       <main className="dashboard-grid">
-        {/* Option 2: Glassmorphism KPI Cards as Top Tile */}
-        <div className="telemetry-kpi-strip" style={{ gridColumn: '1 / -1', display: 'flex', gap: '1.5rem', marginBottom: '1.5rem' }}>
-          <div className="glass-card" style={{ flex: 1, background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.2)', padding: '1.5rem', borderRadius: '1rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <Sun style={{ color: '#fbbf24', width: 48, height: 48 }} />
-            <div>
-              <div style={{ fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Live PV-Leistung</div>
-              <div style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#fbbf24', lineHeight: 1.2 }}>{telemetry.pvLeistung} W</div>
-            </div>
-          </div>
-          <div className="glass-card" style={{ flex: 1, background: telemetry.netzzustand < 0 ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)', border: telemetry.netzzustand < 0 ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid rgba(248, 113, 113, 0.2)', padding: '1.5rem', borderRadius: '1rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-            <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 48, height: 48 }} />
-            <div>
-              <div style={{ fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{telemetry.netzzustand < 0 ? 'Live Netzeinspeisung' : 'Live Netzbezug'}</div>
-              <div style={{ fontSize: '2.25rem', fontWeight: 'bold', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', lineHeight: 1.2 }}>{Math.abs(telemetry.netzzustand)} W</div>
-            </div>
-          </div>
-        </div>
-
         {/* Chart Section */}
+
         <section className="glass-card chart-card">
           <h2>Energy & Price Forecast for {prices.length ? new Date(prices[0].timestamp).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'}) : new Date().toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'})} {lastUpdated && `(last Update: ${lastUpdated})`}</h2>
           <div className="chart-wrapper">
