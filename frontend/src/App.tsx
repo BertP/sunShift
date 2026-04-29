@@ -166,17 +166,20 @@ function App() {
 
 
       
-      // Fetch Spine Devices only if connected
+      try {
+        const logsRes = await axios.get('/api/miele/logs');
+        setApiLogs(logsRes.data);
+      } catch (logErr) {
+        console.error('Failed to fetch API logs', logErr);
+      }
+      
       if (isMieleConnected) {
         const spineRes = await axios.get('/api/spine/devices');
         setSpineDevices(spineRes.data);
-
-        const logsRes = await axios.get('/api/miele/logs');
-        setApiLogs(logsRes.data);
       } else {
         setSpineDevices([]);
-        setApiLogs([]);
       }
+
       
       setError(null);
       setLastUpdated(new Date().toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'}));
