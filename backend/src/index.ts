@@ -323,7 +323,8 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
   try {
     const payload = req.body;
     // Use existing API Log facility
-    const { addApiLog } = require('./services/mieleService');
+    const { addApiLog } = require('./services/logService');
+
     addApiLog('POST', '/api/spine/callback', payload);
     console.log('[spineCallback]: Received webhook:', JSON.stringify(payload));
 
