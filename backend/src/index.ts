@@ -249,9 +249,34 @@ app.post('/api/factory-defaults', async (req: Request, res: Response) => {
             }
           }
         }
+        
+        // Clear Cloud Subscriptions
+        try {
+          const cloudSubs = await axios.get('https://ems.domestic.miele-iot.com/v1/subscriptions', {
+            headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+          });
+          
+          if (Array.isArray(cloudSubs.data)) {
+            for (const s of cloudSubs.data) {
+              const sId = s.subscriptionId || s.id;
+              if (sId) {
+                try {
+                  await axios.delete(`https://ems.domestic.miele-iot.com/v1/subscriptions?subscriptionId=${sId}`, {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+                  });
+                } catch (delErr: any) {
+                  console.error(`[server]: Failed to delete cloud subscription ${sId}:`, delErr.message);
+                }
+              }
+            }
+          }
+        } catch (subFetchErr: any) {
+          console.error('[server]: Failed to fetch cloud subscriptions for cleanup:', subFetchErr.message);
+        }
       } catch (bindFetchErr: any) {
         console.error('[server]: Failed to fetch cloud bindings for cleanup:', bindFetchErr.message);
       }
+
     }
 
     await pool.query('TRUNCATE TABLE device_bindings CASCADE');
