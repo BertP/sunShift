@@ -71,7 +71,8 @@ function App() {
   const [executedRuns, setExecutedRuns] = useState<any[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  const [telemetry, setTelemetry] = useState({ pvLeistung: 0, netzzustand: 0 });
+  const [telemetry, setTelemetry] = useState({ pvLeistung: 0, netzzustand: 0, eUpPower: 0 });
+
 
 
   const [priceSurcharge, setPriceSurcharge] = useState<number>(() => {
@@ -83,7 +84,8 @@ function App() {
     localStorage.setItem('sunshift_price_surcharge', priceSurcharge.toString());
   }, [priceSurcharge]);
 
-  const [visibleDatasets, setVisibleDatasets] = useState<string[]>(['price', 'pv', 'washer', 'dryer', 'dishwasher']);
+  const [visibleDatasets, setVisibleDatasets] = useState<string[]>(['price', 'pv', 'washer', 'dryer', 'dishwasher', 'eup']);
+
 
 
   const chartRef = useRef<any>(null);
@@ -396,6 +398,8 @@ function App() {
   const washerPower: number[] = [];
   const dryerPower: number[] = [];
   const dishwasherPower: number[] = [];
+  const eUpPower: number[] = [];
+
 
   const washerDevice = devices.find(d => d.name.toLowerCase().includes('washer') || d.name.toLowerCase().includes('waschmaschine'));
   const dryerDevice = devices.find(d => d.name.toLowerCase().includes('dryer') || d.name.toLowerCase().includes('trockner'));
@@ -416,16 +420,23 @@ function App() {
       const chunkTime = new Date(baseTime.getTime() + chunk * 15 * 60 * 1000);
       expandedLabels.push(chunkTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       expandedPrices.push(p.price + priceSurcharge);
-
+ 
       
       // Linear chunk interpolation
       const chunkVal = currentSolar + ((nextSolar - currentSolar) * (chunk / 4));
       expandedSolar.push(chunkVal);
-
+ 
       washerPower.push(getDevicePowerAtTime(washerDevice, chunkTime));
       dryerPower.push(getDevicePowerAtTime(dryerDevice, chunkTime));
       dishwasherPower.push(getDevicePowerAtTime(dishwasherDevice, chunkTime));
+
+      // Live EV Charging Power
+      const nowMs = Date.now();
+      const chunkMs = chunkTime.getTime();
+      const isCurrentOrFuture = chunkMs >= nowMs && chunkMs < (nowMs + 2 * 60 * 60 * 1000); // Show next 2 hours if charging
+      eUpPower.push((isCurrentOrFuture && telemetry.eUpPower > 0) ? telemetry.eUpPower : 0);
     }
+
 
   });
 
@@ -483,9 +494,20 @@ function App() {
         borderWidth: 1,
         yAxisID: 'y1',
         stack: 'appliances',
+      }] : []),
+      ...(visibleDatasets.includes('eup') ? [{
+        type: 'bar' as const,
+        label: 'e-up! Charging (W)',
+        data: eUpPower,
+        borderColor: 'rgba(236, 72, 153, 0.8)',
+        backgroundColor: 'rgba(236, 72, 153, 0.6)',
+        borderWidth: 1,
+        yAxisID: 'y1',
+        stack: 'appliances',
       }] : [])
     ]
   };
+
 
 
   const ganttLayoutSync = {
@@ -982,7 +1004,9 @@ function App() {
               { id: 'pv', label: 'PV Forecast', color: '#fbbf24' },
               { id: 'washer', label: 'Washer Forecast', color: 'rgba(34, 197, 94, 0.8)' },
               { id: 'dryer', label: 'Dryer Forecast', color: 'rgba(56, 189, 248, 0.8)' },
-              { id: 'dishwasher', label: 'Dishwasher Forecast', color: 'rgba(249, 115, 22, 0.8)' }
+              { id: 'dishwasher', label: 'Dishwasher Forecast', color: 'rgba(249, 115, 22, 0.8)' },
+              { id: 'eup', label: 'e-up! Charging', color: 'rgba(236, 72, 153, 0.8)' }
+
             ].map(filter => {
               const isActive = visibleDatasets.includes(filter.id);
               return (

@@ -1,6 +1,8 @@
 import WebSocket from 'ws';
 import dotenv from 'dotenv';
+import { updateTelemetry } from './telemetryStore';
 dotenv.config();
+
 
 const HA_URL = 'wss://home.never2sunny.eu/api/websocket';
 const HA_TOKEN = process.env.HA_LL_TOKEN || '';
@@ -72,10 +74,18 @@ const handleTelemetryEvent = (event: any) => {
     const entityId = event.data.entity_id;
     const newState = event.data.new_state;
 
-    if (entityId === 'sensor.pv_leistung' || entityId === 'sensor.netzzustand') {
-      console.log(`[homeAssistantService]: ${entityId} updated to ${newState?.state} W`);
-      // To be expanded for real-time EMS optimization hooks
+    if (entityId === 'sensor.pv_leistung' || entityId === 'sensor.netzzustand' || entityId === 'sensor.smaev_3011444125_charging_station_power') {
+      const value = parseFloat(newState?.state);
+      console.log(`[homeAssistantService]: ${entityId} updated to ${value} W`);
+      
+      if (!isNaN(value)) {
+        if (entityId === 'sensor.pv_leistung') updateTelemetry(value, null, null);
+        if (entityId === 'sensor.netzzustand') updateTelemetry(null, value, null);
+        if (entityId === 'sensor.smaev_3011444125_charging_station_power') updateTelemetry(null, null, value);
+      }
     }
+
+
 
   }
 };

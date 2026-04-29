@@ -75,8 +75,10 @@ app.get('/api/dashboard', async (req: Request, res: Response) => {
       prices: alignedPrices,
       solar: alignedSolar,
       devices,
-      schedules: schedulesResult.rows
+      schedules: schedulesResult.rows,
+      telemetry: liveTelemetry
     });
+
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
