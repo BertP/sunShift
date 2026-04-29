@@ -332,7 +332,9 @@ function App() {
   const getDevicePowerAtTime = (device: any, time: Date): number => {
     if (!device) return 0;
     const seq = powerSequences[device.id];
-    if (!seq || !seq.startTime) return 0;
+    const state = seq?.state || 'inactive';
+    if (!seq || !seq.startTime || (state !== 'scheduled' && state !== 'running')) return 0;
+
     
     const startMs = new Date(seq.startTime).getTime();
     const currentMs = time.getTime();
