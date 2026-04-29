@@ -9,8 +9,10 @@ export interface SpineDevice {
   status: string;
   powerConsumptionW: number;
   bindingId?: string;
+  subscriptionId?: string;
   validUntil?: string;
 }
+
 
 
 import { getAccessToken } from './mieleAuthService';
@@ -183,30 +185,40 @@ export const getSpineDevices = async () => {
       });
 
       const bindingsRes = await axios.get('https://ems.domestic.miele-iot.com/v1/bindings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        }
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       });
       const cloudBindings = Array.isArray(bindingsRes.data) ? bindingsRes.data : [];
 
+      const subsRes = await axios.get('https://ems.domestic.miele-iot.com/v1/subscriptions', {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      });
+      const cloudSubs = Array.isArray(subsRes.data) ? subsRes.data : [];
+
       for (let i = 0; i < liveDevices.length; i++) {
         const dev = liveDevices[i];
+        
+        // Map Binding ID
         if (bindingMap.has(dev.id) && bindingMap.get(dev.id).bindingId && bindingMap.get(dev.id).bindingId !== 'N/A') {
           const data = bindingMap.get(dev.id);
           dev.bindingId = data.bindingId;
           dev.validUntil = data.expires;
         } else if (cloudBindings[i]) {
-          // Fallback to positional index mapping
           dev.bindingId = cloudBindings[i].bindingId || cloudBindings[i].id || 'N/A';
           dev.validUntil = cloudBindings[i].expires || 'Unlimited';
-          // Save this association to DB
           await pool.query('INSERT INTO device_bindings (device_id, binding_id, expires_at) VALUES ($1, $2, $3) ON CONFLICT (device_id) DO UPDATE SET binding_id = EXCLUDED.binding_id, expires_at = EXCLUDED.expires_at', [dev.id, dev.bindingId, dev.validUntil]);
         } else {
           dev.bindingId = 'Pending / None';
           dev.validUntil = 'N/A';
         }
+
+        // Map Subscription ID
+        if (cloudSubs[i]) {
+          dev.subscriptionId = cloudSubs[i].subscriptionId || cloudSubs[i].id || 'N/A';
+        } else {
+          dev.subscriptionId = 'Pending / None';
+        }
       }
+
     } catch (bindErr: any) {
       console.error('[spineService]: Failed to resolve binding mappings:', bindErr.message);
     }

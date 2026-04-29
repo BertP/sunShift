@@ -49,8 +49,10 @@ interface SpineDevice {
   status: string;
   powerConsumptionW: number;
   bindingId?: string;
+  subscriptionId?: string;
   validUntil?: string;
 }
+
 
 function App() {
   const [prices, setPrices] = useState<PriceData[]>([]);
@@ -881,6 +883,10 @@ function App() {
                       {device.bindingId && (
                         <span style={{ fontSize: '0.75rem', color: '#38bdf8', fontFamily: 'monospace' }}>Binding-ID: {device.bindingId}</span>
                       )}
+                      {device.subscriptionId && (
+                        <span style={{ fontSize: '0.75rem', color: '#fbbf24', fontFamily: 'monospace' }}>Subscription-ID: {device.subscriptionId}</span>
+                      )}
+
                       {device.validUntil && (
                         <span style={{ fontSize: '0.75rem', color: '#a855f7' }}>Gültig bis: {formattedValidity}</span>
                       )}
