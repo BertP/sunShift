@@ -931,22 +931,62 @@ function App() {
                 }
 
                 return (
-                  <div key={device.id} className="compact-device-item" style={{ background: 'rgba(255,255,255,0.03)', padding: '0.75rem 1rem', borderRadius: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      <span style={{ fontWeight: 500 }}>{device.name}</span>
-                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>ID: {device.id}</span>
-                      {device.bindingId && (
-                        <span style={{ fontSize: '0.75rem', color: '#38bdf8', fontFamily: 'monospace' }}>Binding-ID: {device.bindingId}</span>
-                      )}
-                      {device.subscriptionId && (
-                        <span style={{ fontSize: '0.75rem', color: '#fbbf24', fontFamily: 'monospace' }}>Subscription-ID: {device.subscriptionId}</span>
-                      )}
+                  <div key={device.id} className="compact-device-card" style={{ 
+                    background: 'rgba(30, 41, 59, 0.4)', 
+                    backdropFilter: 'blur(12px)',
+                    padding: '1.25rem', 
+                    borderRadius: '1rem', 
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    transition: 'all 0.2s ease',
+                    marginBottom: '0.75rem'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.3)';
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.background = 'rgba(30, 41, 59, 0.6)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                    e.currentTarget.style.transform = 'none';
+                    e.currentTarget.style.background = 'rgba(30, 41, 59, 0.4)';
+                  }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#f8fafc', letterSpacing: '-0.01em' }}>{device.name}</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', background: 'rgba(148, 163, 184, 0.15)', color: '#cbd5e1', padding: '0.2rem 0.5rem', borderRadius: '0.25rem' }}>ID: {device.id}</span>
+                        {device.bindingId && (
+                          <span style={{ fontSize: '0.75rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontFamily: 'monospace' }}>🔗 {device.bindingId}</span>
+                        )}
+                        {device.subscriptionId && (
+                          <span style={{ fontSize: '0.75rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontFamily: 'monospace' }}>📝 {device.subscriptionId}</span>
+                        )}
+                      </div>
 
                       {device.validUntil && (
-                        <span style={{ fontSize: '0.75rem', color: '#a855f7' }}>Gültig bis: {formattedValidity}</span>
+                        <span style={{ fontSize: '0.75rem', color: '#c084fc', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
+                          ⏳ Gültig bis: {formattedValidity}
+                        </span>
                       )}
                     </div>
-                    <span style={{ color: '#4ade80', fontSize: '0.875rem', fontWeight: 600 }}>CONNECTED</span>
+                    <span style={{ 
+                      background: 'rgba(74, 222, 128, 0.15)', 
+                      color: '#4ade80', 
+                      fontSize: '0.75rem', 
+                      fontWeight: 700, 
+                      padding: '0.35rem 0.75rem', 
+                      borderRadius: '2rem',
+                      letterSpacing: '0.05em',
+                      border: '1px solid rgba(74, 222, 128, 0.3)',
+                      boxShadow: '0 0 12px rgba(74, 222, 128, 0.2)'
+                    }}>
+                      CONNECTED
+                    </span>
+
                   </div>
                 );
               })}
