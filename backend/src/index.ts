@@ -460,26 +460,7 @@ setInterval(async () => {
   await fetchAndStoreSolarForecast();
   await runOptimization();
 }, 60 * 60 * 1000);
-// Periodic PowerTimeSlot interpretation for scheduled/running devices (every 1 minute)
-setInterval(async () => {
-  try {
-    const { getPowerTimeSlot } = require('./services/spineService');
-    const activeSchedules = await pool.query(
-      "SELECT device_id FROM device_schedules WHERE status IN ('SCHEDULED', 'RUNNING')"
-    );
-    
-    for (const row of activeSchedules.rows) {
-      try {
-        await getPowerTimeSlot(row.device_id);
-        console.log(`[cron]: Periodically refreshed PowerTimeSlots for active device ${row.device_id}`);
-      } catch (ptsErr) {
-        // Silent fallback
-      }
-    }
-  } catch (cronErr: any) {
-    console.error('[cron]: Failed polling active appliance constraints:', cronErr.message);
-  }
-}, 60 * 1000);
+
 
 // Initial Sync after startup
 setTimeout(async () => {

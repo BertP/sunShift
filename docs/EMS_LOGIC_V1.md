@@ -1,20 +1,16 @@
-# EMS Lastgang- & Profil-Synchronisation (v1.0)
+# EMS Lastgang- & Profil-Synchronisation (v1.0.1)
 
-Dieses Dokument beschreibt die Kernlogik zur Erfassung, Speicherung und Darstellung von Geräte-Lastkurven (PowerTimeSlots) im zeitlichen Ablauf des Energiemanagements.
+*Philosophie: Ein EMS ist kein Home Automation Dashboard. Es betreibt strategisches Energiemanagement und dokumentiert getroffene Entscheidungen.*
 
-## 1. Initiales Scheduling ("Scheduled")
-- **Trigger:** Das Gerät wechselt per Webhook in den Status `SCHEDULED` (Benutzer wählt Programm & Flexibilitätsfenster).
-- **Ablauf:**
-  1. Die Miele-API wird einmalig aufgerufen, um die spezifischen `powerTimeSlots` des Programms zu ermitteln.
-  2. Die Slots dienen als Grundlage für den ersten Optimierungsalgorithmus.
+## 1. Ereignisbasierte Erfassung (Callback-Driven)
+Es werden ausschließlich Daten verarbeitet, die durch Miele Cloud SPINE Callbacks (Webhooks) angekündigt werden. Kontinuierliches Polling der Restlaufzeiten für Detailanimationen entfällt vollständig.
 
-## 2. Übergang in den Betrieb ("Running")
-- **Trigger:** Das Gerät wechselt von `SCHEDULED` auf `RUNNING` (oder wird direkt ohne Schedule gestartet).
-- **Ablauf:**
-  - Die ursprüngliche Lastkurve wird zu diesem Zeitpunkt **fest im Diagramm verankert** ("festgetackert").
-  - Erfolgt ein zweiter Durchlauf, zeigt das Diagramm beide Lastkurven übereinander bzw. gestapelt.
-  - Im laufenden Betrieb werden die `powerTimeSlots` kontinuierlich (z.B. minütlich) aktualisiert.
+## 2. Lebenszyklus der Lastgänge
+- **Festtackern bei Erscheinen:** Sobald ein Gerät im System auftaucht (z.B. Status `SCHEDULED`), wird die Lastkurve fest im Diagramm hinterlegt.
+- **Rescheduling:** Verschiebt der Algorithmus oder der Benutzer den Startzeitpunkt, wandert die festgetackerte Lastkurve an das neue Zeitfenster.
+- **Direktstart:** Geht ein Gerät ohne Scheduling direkt in `RUNNING`, wird die Lastkurve sofort an diesem Zeitpunkt verankert.
+- **Block Execution (Gantt):** Auch die Ausführungsblöcke im Gantt-Diagramm werden beim Übergang auf `RUNNING` fest getrackt. Weitere Durchläufe sind eigenständige Events.
 
-## 3. Datenanzeige & Tooltips
-- **Verlaufsgrafik (Chart):** Zeigt stets die festgetackerte Ursprungs-Lastkurve.
-- **Hover Popup (Gantt):** Berechnet und zeigt dynamisch den aktuell *verbleibenden* Lastgang auf Basis der Live-Slots.
+## 3. Abgeschaffte Features (Obsolete)
+- **Dynamische Hover Popups:** Keine dynamischen Restlaufzeitanzeigen im Tooltip.
+- **Live Remaining Time:** Kein permanentes Herunterzählen von Profilkapazitäten.
