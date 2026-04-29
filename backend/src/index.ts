@@ -319,7 +319,38 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
   }
 });
 
+app.post('/api/spine/callback', async (req: Request, res: Response) => {
+  try {
+    const payload = req.body;
+    // Use existing API Log facility
+    const { addApiLog } = require('./services/mieleService');
+    addApiLog('POST', '/api/spine/callback', payload);
+    console.log('[spineCallback]: Received webhook:', JSON.stringify(payload));
+
+    if (Array.isArray(payload)) {
+      for (const item of payload) {
+        if (item.change === 'createReplace' && item.feature && item.feature.featureObjType === 'powerSequence') {
+          const seq = item.feature;
+          const deviceId = seq.deviceId;
+          if (deviceId && seq.data) {
+             await pool.query(
+               'UPDATE device_schedules SET status = $1, scheduled_start = $2, scheduled_end = $3 WHERE device_id = $4',
+               [seq.data.state ? seq.data.state.toUpperCase() : 'SCHEDULED', seq.data.startTime, seq.data.endTime, deviceId]
+             );
+             console.log(`[spineCallback]: Updated ${deviceId} to ${seq.data.state}`);
+          }
+        }
+      }
+    }
+    res.sendStatus(200);
+  } catch (e: any) {
+    console.error('[spineCallback]: Failed processing webhook:', e.message);
+    res.sendStatus(500);
+  }
+});
+
 app.post('/api/optimize', async (req: Request, res: Response) => {
+
   try {
     addApiLog('STORY', 'Optimizer', '• Starte intelligenten EMS-Abgleich\n• Aktualisiere Spot-Markt-Preise\n• Lade PV Prognose neu\n• Optimiere Einschaltzeiten der Geräte');
     await fetchAndStorePrices();
