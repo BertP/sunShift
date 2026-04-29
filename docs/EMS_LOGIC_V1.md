@@ -9,7 +9,10 @@ Dieses Dokument definiert die algorithmischen Kernregeln zur intelligenten Taktu
 
 ## 2. Geräte-Priorisierung & Constraints
 * **Dishwasher (Spülmaschine)**: Muss als allererstes Gerät fertiggestellt werden (höchste zeitliche Priorität).
-* **Dynamisches Rescheduling**: Die Einschaltzeiten dürfen bei sich ändernden Wetter- oder Preiskurven jederzeit flexibel neu zugewiesen werden.
+* **Persistenz des Flexibilitäts-Zeitraums**: Der vom Kunden definierte Rahmen (`earliestStartTime` bis `latestEndTime`) ist absolut bindend. Er wird durch lokale EMS-Kalkulationen weder verschoben noch verkürzt und bleibt persistent erhalten.
+* **Dynamisches Rescheduling**: Die Einschaltzeiten dürfen bei sich ändernden Wetter- oder Preiskurven innerhalb des Flex-Fensters jederzeit flexibel neu zugewiesen werden.
+
+
 
 ## 3. Datenquellen & API Schnittstellen
 Zur Lastoptimierung steht folgender Miele Cloud Endpunkt bereit:

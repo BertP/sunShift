@@ -82,7 +82,20 @@ app.get('/api/features/powerSequence', async (req: Request, res: Response) => {
     if (!deviceId) return res.status(400).json({ error: 'deviceId required' });
 
     const sequenceData = await getPowerSequence(deviceId as string);
+    const schedResult = await pool.query('SELECT * FROM device_schedules WHERE device_id = $1 ORDER BY id DESC LIMIT 1', [deviceId]);
+    
+    if (schedResult.rows.length > 0 && sequenceData) {
+      const sched = schedResult.rows[0];
+      return res.json({
+        ...sequenceData,
+        state: 'scheduled',
+        startTime: new Date(sched.scheduled_start).toISOString(),
+        endTime: new Date(sched.scheduled_end).toISOString()
+      });
+    }
+
     res.json(sequenceData);
+
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
