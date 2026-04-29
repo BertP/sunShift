@@ -953,7 +953,8 @@ function App() {
             </div>
           )}
           
-          {viewMode === 'developer' && isMieleConnected && apiLogs.length > 0 && (
+          {viewMode === 'developer' && apiLogs.length > 0 && (
+
             <div className="api-logs-list" style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', margin: 0 }}>API Activity Logs:</h3>
@@ -1280,7 +1281,8 @@ function App() {
         <p>&copy; 2026 SunShift EMS | Smart Energy. Perfect Timing. | v{packageJson.version}</p>
 
       </footer>
-      {isLogsDetached && viewMode === 'developer' && (
+      {isLogsDetached && (
+
         <>
           {/* System Ticker Window */}
           <div 

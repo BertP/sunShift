@@ -422,7 +422,31 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
               [deviceId, slotNumber, durationMins, Number(powerW)]
             );
             console.log(`[spineCallback]: Logged dynamic time slot ${slotNumber} for ${deviceId} (${powerW} W)`);
+
+            // Auto-pin executed runs if the machine is already RUNNING
+            const schedRes = await pool.query(
+              "SELECT status, scheduled_start FROM device_schedules WHERE device_id = $1 ORDER BY id DESC LIMIT 1",
+              [deviceId]
+            );
+            if (schedRes.rows.length > 0 && schedRes.rows[0].status === 'RUNNING') {
+              const existingRun = await pool.query(
+                "SELECT id FROM executed_runs WHERE device_id = $1 AND start_time >= NOW() - INTERVAL '2 hours'",
+                [deviceId]
+              );
+              if (existingRun.rows.length === 0) {
+                const { getPowerTimeSlot } = require('./services/spineService');
+                try {
+                  const slotsData = await getPowerTimeSlot(deviceId);
+                  await pool.query(
+                    "INSERT INTO executed_runs (device_id, device_name, start_time, profile_slots) VALUES ($1, $2, $3, $4)",
+                    [deviceId, 'Miele Device', schedRes.rows[0].scheduled_start || new Date().toISOString(), JSON.stringify(slotsData.slots)]
+                  );
+                  console.log(`[spineCallback]: Pinned updated run profile for ${deviceId} via dynamic slot update`);
+                } catch (ptsErr2) {}
+              }
+            }
           }
+
         }
       }
     }
