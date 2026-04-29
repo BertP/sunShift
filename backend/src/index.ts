@@ -2,6 +2,8 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { initDB } from './db';
+import { connectToHomeAssistant } from './services/homeAssistantService';
+
 
 dotenv.config();
 
@@ -19,10 +21,16 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'SunShift EMS Backend is running' });
 });
 
+app.get('/api/telemetry', (req: Request, res: Response) => {
+  res.json(liveTelemetry);
+});
+
 import { getPrices, fetchAndStorePrices } from './services/priceService';
 import { getSolarForecast, fetchAndStoreSolarForecast } from './services/solarService';
 import { getMieleDevices } from './services/mieleService';
 import { runOptimization } from './services/emsService';
+import { liveTelemetry } from './services/telemetryStore';
+
 import pool from './db';
 
 app.get('/api/dashboard', async (req: Request, res: Response) => {
@@ -88,10 +96,11 @@ app.get('/api/features/powerSequence', async (req: Request, res: Response) => {
       const sched = schedResult.rows[0];
       return res.json({
         ...sequenceData,
-        state: 'scheduled',
-        startTime: new Date(sched.scheduled_start).toISOString(),
-        endTime: new Date(sched.scheduled_end).toISOString()
+        state: sequenceData.state || 'scheduled',
+        startTime: sequenceData.startTime || new Date(sched.scheduled_start).toISOString(),
+        endTime: sequenceData.endTime || new Date(sched.scheduled_end).toISOString()
       });
+
     }
 
     res.json(sequenceData);
@@ -100,6 +109,53 @@ app.get('/api/features/powerSequence', async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
+app.get('/api/features/powerTimeSlot', async (req: Request, res: Response) => {
+  try {
+    const { deviceId } = req.query;
+    if (!deviceId) return res.status(400).json({ error: 'deviceId required' });
+    
+    let timeSlots: any[] = [
+      { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 500 },
+      { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1200 },
+      { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 1800 },
+      { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1000 }
+    ];
+    
+    if (deviceId === '000186348553') { 
+      timeSlots = [
+        { chunkIndex: 0, durationMinutes: 7.5, powerConsumptionW: 50 },
+        { chunkIndex: 1, durationMinutes: 31.3, powerConsumptionW: 2100 },
+        { chunkIndex: 2, durationMinutes: 110.25, powerConsumptionW: 150 }
+      ];
+    } else if (deviceId === '000105666767') { 
+      timeSlots = [
+        { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 150 },
+        { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1800 },
+        { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 2000 },
+        { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1200 },
+        { chunkIndex: 4, durationMinutes: 15, powerConsumptionW: 600 },
+        { chunkIndex: 5, durationMinutes: 15, powerConsumptionW: 800 },
+        { chunkIndex: 6, durationMinutes: 15, powerConsumptionW: 200 },
+        { chunkIndex: 7, durationMinutes: 15, powerConsumptionW: 50 }
+      ];
+    } else if (deviceId === '000091093524') { 
+      timeSlots = [
+        { chunkIndex: 0, durationMinutes: 10.2, powerConsumptionW: 300 },
+        { chunkIndex: 1, durationMinutes: 49.8, powerConsumptionW: 800 }
+      ];
+    }
+
+
+    res.json({
+      deviceId,
+      slots: timeSlots
+    });
+
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 app.get('/api/spine/devices', async (req: Request, res: Response) => {
   try {
@@ -296,6 +352,8 @@ setTimeout(async () => {
   await fetchAndStorePrices();
   await fetchAndStoreSolarForecast();
   await runOptimization();
+  connectToHomeAssistant();
+
 }, 5000);
 
 app.listen(PORT, () => {
