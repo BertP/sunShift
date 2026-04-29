@@ -454,13 +454,15 @@ function App() {
       const xAxis = chart.scales.x;
       const yAxis = chart.scales.y;
       
+      if (!prices.length) return;
       const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      const index = hours * 4 + (minutes / 15);
+      const firstPriceTime = new Date(prices[0].timestamp);
+      const elapsedMs = now.getTime() - firstPriceTime.getTime();
+      const index = elapsedMs / (1000 * 60 * 15);
       const xPos = xAxis.getPixelForValue(index);
       
       if (xPos < xAxis.left || xPos > xAxis.right) return;
+
       
       ctx.save();
       ctx.beginPath();
