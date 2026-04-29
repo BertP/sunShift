@@ -230,7 +230,25 @@ function App() {
     }
   };
 
+  const handleCopyToken = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get('/api/miele/status');
+      if (res.data.token) {
+        await navigator.clipboard.writeText(res.data.token);
+        setConfigMessage('Token kopiert!');
+      } else {
+        setConfigMessage('Kein Token vorhanden.');
+      }
+    } catch (err) {
+      setConfigMessage('Kopieren fehlgeschlagen.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFactoryReset = async () => {
+
     if (!window.confirm('Are you sure you want to clear all bindings, disconnect accounts and reset to Factory Defaults?')) return;
     try {
       setLoading(true);
@@ -773,6 +791,19 @@ function App() {
             >
               {isMieleConnected ? 'Disconnect' : 'Connect Account'}
             </button>
+            
+            {isMieleConnected && (
+              <button 
+                type="button" 
+                onClick={handleCopyToken} 
+                disabled={loading} 
+                className="btn-primary"
+                style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)' }}
+              >
+                Copy Token
+              </button>
+            )}
+
             
             <button 
               type="button" 

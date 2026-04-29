@@ -213,8 +213,10 @@ app.get('/api/miele/callback', async (req: Request, res: Response) => {
 });
 
 app.get('/api/miele/status', (req: Request, res: Response) => {
-  res.json({ connected: isConnected() });
+  const { getAccessToken } = require('./services/mieleAuthService');
+  res.json({ connected: isConnected(), token: getAccessToken() });
 });
+
 
 app.post('/api/miele/disconnect', (req: Request, res: Response) => {
   disconnectMiele();
