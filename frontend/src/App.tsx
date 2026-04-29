@@ -145,7 +145,34 @@ function App() {
       document.removeEventListener('mouseup', onMouseUp);
     };
   }, [dragging, rel]);
+  
+  const [callbackPos, setCallbackPos] = useState({ x: Math.floor(window.innerWidth / 2) - 200, y: Math.floor(window.innerHeight / 2) - 250 });
+  const [callbackDragging, setCallbackDragging] = useState(false);
+  const [callbackRel, setCallbackRel] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!callbackDragging) return;
+      setCallbackPos({
+        x: Math.max(10, Math.min(window.innerWidth - 100, e.clientX - callbackRel.x)),
+        y: Math.max(10, Math.min(window.innerHeight - 100, e.clientY - callbackRel.y))
+      });
+    };
+    const onMouseUp = () => {
+      setCallbackDragging(false);
+    };
+    if (callbackDragging) {
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [callbackDragging, callbackRel]);
+
   const [helpSection, setHelpSection] = useState<'overview' | 'chart' | 'devices' | 'developer'>('overview');
+
 
   const fetchData = async () => {
     try {
@@ -920,65 +947,41 @@ function App() {
                 }
 
                 return (
-                  <div key={device.id} className="compact-device-card" style={{ 
-                    background: 'rgba(30, 41, 59, 0.4)', 
-                    backdropFilter: 'blur(12px)',
-                    padding: '1.25rem', 
-                    borderRadius: '1rem', 
+                  <div key={device.id} className="compact-device-row" style={{ 
+                    padding: '0.5rem 1rem', 
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    borderRadius: '0.5rem',
                     border: '1px solid rgba(255, 255, 255, 0.05)',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
                     display: 'flex', 
                     justifyContent: 'space-between', 
                     alignItems: 'center',
-                    transition: 'all 0.2s ease',
-                    marginBottom: '0.75rem'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(34, 197, 94, 0.3)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.background = 'rgba(30, 41, 59, 0.6)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
-                    e.currentTarget.style.transform = 'none';
-                    e.currentTarget.style.background = 'rgba(30, 41, 59, 0.4)';
-                  }}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <span style={{ fontWeight: 600, fontSize: '1.1rem', color: '#f8fafc', letterSpacing: '-0.01em' }}>{device.name}</span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', background: 'rgba(148, 163, 184, 0.15)', color: '#cbd5e1', padding: '0.2rem 0.5rem', borderRadius: '0.25rem' }}>ID: {device.id}</span>
-                        {device.bindingId && (
-                          <span style={{ fontSize: '0.75rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontFamily: 'monospace' }}>🔗 {device.bindingId}</span>
-                        )}
-                        {device.subscriptionId && (
-                          <span style={{ fontSize: '0.75rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '0.25rem', fontFamily: 'monospace' }}>📝 {device.subscriptionId}</span>
-                        )}
-                      </div>
-
+                    marginBottom: '0.5rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#f8fafc', minWidth: '140px' }}>{device.name}</span>
+                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>ID: {device.id}</span>
+                      {device.bindingId && (
+                        <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>Binding-ID: {device.bindingId}</span>
+                      )}
+                      {device.subscriptionId && (
+                        <span style={{ fontSize: '0.75rem', color: '#fbbf24' }}>Subscription-ID: {device.subscriptionId}</span>
+                      )}
                       {device.validUntil && (
-                        <span style={{ fontSize: '0.75rem', color: '#c084fc', display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
-                          ⏳ Gültig bis: {formattedValidity}
-                        </span>
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Gültig: {formattedValidity}</span>
                       )}
                     </div>
                     <span style={{ 
-                      background: 'rgba(74, 222, 128, 0.15)', 
                       color: '#4ade80', 
                       fontSize: '0.75rem', 
                       fontWeight: 700, 
-                      padding: '0.35rem 0.75rem', 
-                      borderRadius: '2rem',
-                      letterSpacing: '0.05em',
-                      border: '1px solid rgba(74, 222, 128, 0.3)',
-                      boxShadow: '0 0 12px rgba(74, 222, 128, 0.2)'
+                      letterSpacing: '0.05em'
                     }}>
                       CONNECTED
                     </span>
-
                   </div>
                 );
               })}
+
             </div>
           )}
           
@@ -1397,8 +1400,8 @@ function App() {
           <div 
             style={{ 
               position: 'fixed', 
-              left: `${logPos.x}px`, 
-              top: `${logPos.y}px`, 
+              left: `${callbackPos.x}px`, 
+              top: `${callbackPos.y}px`, 
               width: '400px', 
               height: '500px',
               background: 'rgba(15, 23, 42, 0.95)', 
@@ -1408,7 +1411,7 @@ function App() {
               borderRadius: '0.75rem', 
               padding: '1rem', 
               boxShadow: '0 10px 25px rgba(0,0,0,0.5)', 
-              zIndex: 9997, 
+              zIndex: 9999, 
               display: 'flex', 
               flexDirection: 'column',
               resize: 'both',
@@ -1426,11 +1429,12 @@ function App() {
                 userSelect: 'none'
               }}
               onMouseDown={(e) => {
-                setDragging(true);
-                setRel({
-                  x: e.clientX - logPos.x,
-                  y: e.clientY - logPos.y
+                setCallbackDragging(true);
+                setCallbackRel({
+                  x: e.clientX - callbackPos.x,
+                  y: e.clientY - callbackPos.y
                 });
+
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
