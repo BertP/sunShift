@@ -275,37 +275,25 @@ export const getPowerTimeSlot = async (deviceId: string) => {
 
     return response.data;
   } catch (error: any) {
-    let timeSlots = [
-      { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 500 },
-      { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1200 },
-      { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 1800 },
-      { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1000 }
-    ];
+    const { Pool } = require('pg');
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL || 'postgresql://postgres:sunshift@localhost:5432/sunshift'
+    });
+    const dbSlots = await pool.query(
+      'SELECT slot_number, duration_minutes, power_w FROM dynamic_power_slots WHERE device_id = $1 ORDER BY slot_number ASC',
+      [deviceId]
+    );
     
-    if (deviceId === '000186348553') { 
-      timeSlots = [
-        { chunkIndex: 0, durationMinutes: 7.5, powerConsumptionW: 50 },
-        { chunkIndex: 1, durationMinutes: 31.3, powerConsumptionW: 2100 },
-        { chunkIndex: 2, durationMinutes: 110.25, powerConsumptionW: 150 }
-      ];
-    } else if (deviceId === '000105666767') { 
-      timeSlots = [
-        { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 150 },
-        { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1800 },
-        { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 2000 },
-        { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1200 },
-        { chunkIndex: 4, durationMinutes: 15, powerConsumptionW: 600 },
-        { chunkIndex: 5, durationMinutes: 15, powerConsumptionW: 800 },
-        { chunkIndex: 6, durationMinutes: 15, powerConsumptionW: 200 },
-        { chunkIndex: 7, durationMinutes: 15, powerConsumptionW: 50 }
-      ];
-    } else if (deviceId === '000091093524') { 
-      timeSlots = [
-        { chunkIndex: 0, durationMinutes: 10.2, powerConsumptionW: 300 },
-        { chunkIndex: 1, durationMinutes: 49.8, powerConsumptionW: 800 }
-      ];
+    if (dbSlots.rows.length > 0) {
+      const timeSlots = dbSlots.rows.map((r: any, idx: number) => ({
+        chunkIndex: idx,
+        durationMinutes: r.duration_minutes,
+        powerConsumptionW: r.power_w
+      }));
+      return { deviceId, slots: timeSlots };
     }
-    return { deviceId, slots: timeSlots };
+    throw new Error(`Kein dynamischer Lastgang verfügbar für dieses Gerät (${deviceId})`);
+
   }
 };
 

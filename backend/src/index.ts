@@ -131,47 +131,16 @@ app.get('/api/features/powerTimeSlot', async (req: Request, res: Response) => {
       [deviceId]
     );
     
-    if (dbSlots.rows.length > 0) {
-      timeSlots = dbSlots.rows.map((r: any, idx: number) => ({
-        chunkIndex: idx,
-        durationMinutes: r.duration_minutes,
-        powerConsumptionW: r.power_w
-      }));
-    } else {
-      timeSlots = [
-        { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 500 },
-        { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1200 },
-        { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 1800 },
-        { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1000 }
-      ];
-    }
-
-    
     if (dbSlots.rows.length === 0) {
-      if (deviceId === '000186348553') { 
-        timeSlots = [
-          { chunkIndex: 0, durationMinutes: 7.5, powerConsumptionW: 50 },
-          { chunkIndex: 1, durationMinutes: 31.3, powerConsumptionW: 2100 },
-          { chunkIndex: 2, durationMinutes: 110.25, powerConsumptionW: 150 }
-        ];
-      } else if (deviceId === '000105666767') { 
-        timeSlots = [
-          { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 150 },
-          { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1800 },
-          { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 2000 },
-          { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1200 },
-          { chunkIndex: 4, durationMinutes: 15, powerConsumptionW: 600 },
-          { chunkIndex: 5, durationMinutes: 15, powerConsumptionW: 800 },
-          { chunkIndex: 6, durationMinutes: 15, powerConsumptionW: 200 },
-          { chunkIndex: 7, durationMinutes: 15, powerConsumptionW: 50 }
-        ];
-      } else if (deviceId === '000091093524') { 
-        timeSlots = [
-          { chunkIndex: 0, durationMinutes: 10.2, powerConsumptionW: 300 },
-          { chunkIndex: 1, durationMinutes: 49.8, powerConsumptionW: 800 }
-        ];
-      }
+      return res.status(404).json({ error: `Kein dynamischer Lastgang verfügbar für dieses Gerät (${deviceId})` });
     }
+    
+    timeSlots = dbSlots.rows.map((r: any, idx: number) => ({
+      chunkIndex: idx,
+      durationMinutes: r.duration_minutes,
+      powerConsumptionW: r.power_w
+    }));
+
 
 
 
