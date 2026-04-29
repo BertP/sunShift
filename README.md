@@ -5,9 +5,10 @@ Ein intelligentes Energiemanagement-System zur automatischen Taktung von Haushal
 ## Features
 
 * **Live Gantt-Schedules**: Dynamische Zuweisung von Startzeitfenstern für intelligente EEBUS Use Cases (`flexibleStartForWhiteGoods`).
-* **Interpolierte Datenströme**: 15-Minuten Interpolation zwischen Preispeaks und solaren Überschusswerten für flüssige Visualisierungen.
-* **Optimierte API Zyklen**: Vermeidung von Limits mittels asynchroner 24h/60m Cron-Services.
-* **Interaktive Steuern & Umlagen**: Anpassbare Schwellenwerte im Configure-Bereich.
+* **Live-Telemetry & Multi-Day History**: Kontinuierliche 7-Tage Speicherung von PV-Ertrag und Netzstatus mit interaktiver Liniendiagramm-Sicht.
+* **Vergangenheits- & Prognose-Navigation**: Footer-Widget zur freien Datumsauswahl `< TT.MM.JJJJ >` (Prognosewerte für den Folgetag ab 14:00 Uhr verfügbar).
+* **Optimierte API Zyklen**: Reduzierung interner Polling-Overheads auf EEBUS/Miele Spine-Netzwerkgrenzen.
+
 
 ## Deployment & Setup
 

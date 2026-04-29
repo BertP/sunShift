@@ -28,7 +28,20 @@ export const fetchAndStorePrices = async () => {
   }
 };
 
-export const getPrices = async () => {
-  const result = await pool.query('SELECT * FROM prices WHERE timestamp >= CURRENT_DATE ORDER BY timestamp ASC LIMIT 24');
+export const getPrices = async (dateString?: string) => {
+  let query = 'SELECT * FROM prices WHERE timestamp >= CURRENT_DATE ORDER BY timestamp ASC LIMIT 48';
+  let params: any[] = [];
+
+  if (dateString) {
+    query = `
+      SELECT * FROM prices 
+      WHERE timestamp::date = $1::date 
+      ORDER BY timestamp ASC
+    `;
+    params = [dateString];
+  }
+  
+  const result = await pool.query(query, params);
   return result.rows;
 };
+

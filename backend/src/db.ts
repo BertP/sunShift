@@ -62,7 +62,15 @@ export const initDB = async () => {
         updated_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(device_id, slot_number)
       );
+      CREATE TABLE IF NOT EXISTS live_telemetry_history (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        pv_power_w FLOAT NOT NULL,
+        grid_power_w FLOAT NOT NULL,
+        ev_power_w FLOAT DEFAULT 0
+      );
     `);
+
 
 
     console.log('[db]: Database tables initialized');

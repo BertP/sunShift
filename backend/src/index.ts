@@ -35,19 +35,23 @@ import pool from './db';
 
 app.get('/api/dashboard', async (req: Request, res: Response) => {
   try {
+    const { date } = req.query;
+    const dateStr = typeof date === 'string' ? date : undefined;
+
     addApiLog('STORY', 'System Ticker', '• Initialisiere Dashboard Aktualisierung\n• Lese Strompreise & PV-Ertragsprognose (lokal)\n• Synchronisiere Miele Cloud Geräte');
-    const prices = await getPrices();
-    const solar = await getSolarForecast();
+    const prices = await getPrices(dateStr);
+    const solar = await getSolarForecast(dateStr);
     const devices = await getMieleDevices();
     const schedulesResult = await pool.query('SELECT * FROM device_schedules ORDER BY scheduled_start DESC LIMIT 10');
 
-    const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const baseDate = dateStr ? new Date(dateStr) : new Date();
+    const startOfDay = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), 0, 0, 0);
 
     const alignedPrices: any[] = [];
     const alignedSolar: any[] = [];
 
     for (let i = 0; i < 24; i++) {
+
       const targetTime = new Date(startOfDay.getTime() + i * 60 * 60 * 1000);
       
       const pricePoint = prices.find(p => {
@@ -83,6 +87,26 @@ app.get('/api/dashboard', async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+app.get('/api/telemetry-history', async (req: Request, res: Response) => {
+  try {
+    const { date } = req.query;
+    if (!date) return res.status(400).json({ error: 'Date query param required' });
+
+    const result = await pool.query(
+      `SELECT id, timestamp, pv_power_w, grid_power_w, ev_power_w 
+       FROM live_telemetry_history 
+       WHERE timestamp::date = $1::date 
+       ORDER BY timestamp ASC`,
+      [date]
+    );
+
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 import { getSpineDevices, configureSpineApi, getPowerSequence } from './services/spineService';
 

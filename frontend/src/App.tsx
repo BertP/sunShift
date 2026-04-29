@@ -14,9 +14,14 @@ import {
 } from 'lucide-react';
 
 import { Chart as ChartJS, registerables } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line } from 'react-chartjs-2';
 
+
+import { FloatingPanels } from './components/FloatingPanels';
+import { GanttTimeline } from './components/GanttTimeline';
 import packageJson from '../package.json';
+
+
 
 ChartJS.register(...registerables);
 
@@ -85,6 +90,10 @@ function App() {
   }, [priceSurcharge]);
 
   const [visibleDatasets, setVisibleDatasets] = useState<string[]>(['price', 'pv', 'washer', 'dryer', 'dishwasher', 'eup']);
+  const [viewType, setViewType] = useState<'forecast' | 'live'>('forecast');
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [liveHistory, setLiveHistory] = useState<any[]>([]);
+
 
 
 
@@ -96,6 +105,27 @@ function App() {
   const [viewMode, setViewMode] = useState<'customer' | 'developer'>('developer');
   const [showHelp, setShowHelp] = useState(false);
   const [isRebooting, setIsRebooting] = useState(false);
+
+  const handleDateChange = (days: number) => {
+    const current = new Date(selectedDate);
+    current.setDate(current.getDate() + days);
+    
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+
+    if (current > tomorrow) return;
+
+    if (current.getDate() === tomorrow.getDate() && current.getMonth() === tomorrow.getMonth() && current.getFullYear() === tomorrow.getFullYear()) {
+      if (today.getHours() < 14) {
+        alert("Prognosen für morgen sind erst ab 14:00 Uhr verfügbar.");
+        return;
+      }
+    }
+
+    setSelectedDate(current.toISOString().split('T')[0]);
+  };
+
   const [tickerPos, setTickerPos] = useState({ x: window.innerWidth - 450, y: 200 });
   const [tickerDragging, setTickerDragging] = useState(false);
 
@@ -179,7 +209,8 @@ function App() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/dashboard');
+      
+      const response = await axios.get(`/api/dashboard?date=${selectedDate}`);
       setPrices(response.data.prices);
       setSolar(response.data.solar);
       setDevices(response.data.devices);
@@ -187,28 +218,24 @@ function App() {
       setPowerSequences({});
       setPowerTimeSlots({});
 
+      try {
+        const histRes = await axios.get(`/api/telemetry-history?date=${selectedDate}`);
+        setLiveHistory(histRes.data);
+      } catch (histErr) {
+        console.error('Failed to fetch telemetry history', histErr);
+      }
 
       try {
         const runsRes = await axios.get('/api/executed-runs');
         setExecutedRuns(runsRes.data);
       } catch (runErr) {}
 
-
-      
       try {
         const logsRes = await axios.get('/api/miele/logs');
         setApiLogs(logsRes.data);
       } catch (logErr) {
         console.error('Failed to fetch API logs', logErr);
       }
-      
-      if (isMieleConnected) {
-        const spineRes = await axios.get('/api/spine/devices');
-        setSpineDevices(spineRes.data);
-      } else {
-        setSpineDevices([]);
-      }
-
       
       setError(null);
       setLastUpdated(new Date().toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'}));
@@ -219,6 +246,7 @@ function App() {
       setLoading(false);
     }
   };
+
 
   const triggerOptimize = async () => {
     try {
@@ -355,7 +383,8 @@ function App() {
     fetchData();
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
-  }, [isMieleConnected]);
+  }, [isMieleConnected, selectedDate]);
+
 
   const getDevicePowerAtTime = (device: any, time: Date): number => {
     if (!device) return 0;
@@ -454,9 +483,53 @@ function App() {
       const isCurrentOrFuture = chunkMs >= nowMs && chunkMs < (nowMs + 2 * 60 * 60 * 1000); // Show next 2 hours if charging
       eUpPower.push((isCurrentOrFuture && telemetry.eUpPower > 0) ? telemetry.eUpPower : 0);
     }
-
-
   });
+
+  const liveChartData = {
+
+    labels: liveHistory.map((pt: any) => new Date(pt.timestamp).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})),
+    datasets: [
+      {
+        label: 'PV Ertrag (W)',
+        data: liveHistory.map((pt: any) => pt.pv_power_w),
+        borderColor: '#fbbf24',
+        backgroundColor: 'rgba(251, 189, 36, 0.1)',
+        tension: 0.4,
+        fill: true
+      },
+      {
+        label: 'Netzstatus (W)',
+        data: liveHistory.map((pt: any) => pt.grid_power_w),
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        tension: 0.4,
+        fill: true
+      }
+    ]
+  };
+
+  const liveChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+        labels: { color: '#f1f5f9' }
+      }
+    },
+    scales: {
+      y: {
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: '#94a3b8' }
+      },
+      x: {
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: '#94a3b8', maxTicksLimit: 12 }
+      }
+    }
+  };
+
+
 
   const chartData = {
     labels: expandedLabels.length ? expandedLabels : ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
@@ -1031,7 +1104,47 @@ function App() {
         {/* Chart Section */}
 
         <section className="glass-card chart-card">
-          <h2>Energy & Price Forecast for {prices.length ? new Date(prices[0].timestamp).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'}) : new Date().toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'})} {lastUpdated && `(last Update: ${lastUpdated})`}</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <h2 style={{ margin: 0 }}>
+              {viewType === 'forecast' ? 'Energy & Price Forecast' : 'Live Power Analytics'} for {selectedDate ? new Date(selectedDate).toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE')} {lastUpdated && `(last Update: ${lastUpdated})`}
+            </h2>
+            
+            <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '2rem', padding: '2px' }}>
+              <button 
+                onClick={() => setViewType('forecast')}
+                style={{
+                  padding: '0.4rem 1rem',
+                  borderRadius: '2rem',
+                  border: 'none',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: viewType === 'forecast' ? '#fbbf24' : 'transparent',
+                  color: viewType === 'forecast' ? '#0f172a' : '#94a3b8',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Forecast
+              </button>
+              <button 
+                onClick={() => setViewType('live')}
+                style={{
+                  padding: '0.4rem 1rem',
+                  borderRadius: '2rem',
+                  border: 'none',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: viewType === 'live' ? '#38bdf8' : 'transparent',
+                  color: viewType === 'live' ? '#0f172a' : '#94a3b8',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                Live
+              </button>
+            </div>
+          </div>
+
           
           <div className="chart-filter-selector" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem', justifyContent: 'center' }}>
             {[
@@ -1077,126 +1190,104 @@ function App() {
           </div>
 
           <div className="chart-wrapper">
-            <Bar ref={chartRef} data={chartData as any} options={chartOptions} plugins={[ganttLayoutSync, currentTimeLine]} />
-
+            {viewType === 'forecast' ? (
+              <Bar ref={chartRef} data={chartData as any} options={chartOptions} plugins={[ganttLayoutSync, currentTimeLine]} />
+            ) : (
+              <Line data={liveChartData as any} options={liveChartOptions as any} />
+            )}
           </div>
+
 
           {/* Gantt Chart Schedules directly aligned under graph */}
 
-          <div id="gantt-chart-container" className="gantt-chart" style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxSizing: 'border-box' }}>
+          <GanttTimeline 
+            devices={devices}
+            prices={prices}
+            powerSequences={powerSequences}
+            powerTimeSlots={powerTimeSlots}
+          />
 
-            {devices.map((device) => {
-              const firstPriceTime = prices.length ? new Date(prices[0].timestamp).getTime() : Date.now();
-              const totalSpan = 24 * 60 * 60 * 1000;
+            {/* Date Pagination Footer */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              gap: '1.5rem', 
+              marginTop: '2rem',
+              borderTop: '1px solid rgba(255,255,255,0.1)',
+              paddingTop: '1.5rem'
+            }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '1.5rem', 
+                background: '#1e293b', 
+                padding: '0.5rem 1.5rem', 
+                borderRadius: '2rem', 
+                boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+                border: '1px solid rgba(255,255,255,0.1)' 
+              }}>
+                <button 
+                  onClick={() => handleDateChange(-1)}
+                  style={{
+                    background: 'rgba(255,255,255,0.1)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Tag zurück"
+                >
+                  &lt;
+                </button>
+                
+                <span style={{ 
+                  fontSize: '1rem', 
+                  fontWeight: 700, 
+                  color: '#ffffff',
+                  letterSpacing: '0.05em'
+                }}>
+                  {selectedDate ? new Date(selectedDate).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'}) : 'Tagesdaten'}
+                </span>
 
-              const seq = powerSequences[device.id];
-              const isScheduledOrRunning = seq && (seq.state === 'scheduled' || seq.state === 'running');
-
-              const earliestTime = seq && seq.earliestStartTime ? new Date(seq.earliestStartTime).getTime() : firstPriceTime; 
-              const latestTime = seq && seq.latestEndTime ? new Date(seq.latestEndTime).getTime() : (firstPriceTime + totalSpan);
-              const startTime = seq && seq.startTime ? new Date(seq.startTime).getTime() : earliestTime;
-              const endTime = seq && seq.endTime ? new Date(seq.endTime).getTime() : earliestTime;
-
-              const deviceSlots = powerTimeSlots[device.id]?.slots || [];
-              const totalMins = deviceSlots.reduce((acc: number, s: any) => acc + s.durationMinutes, 0) || 1;
-              const maxW = Math.max(...deviceSlots.map((s: any) => s.powerConsumptionW), 1);
-
-              // Calculate Percentages
-
-              const flexLeft = Math.max(0, Math.min(100, ((earliestTime - firstPriceTime) / totalSpan) * 100));
-              const flexWidth = Math.max(0, Math.min(100 - flexLeft, ((latestTime - earliestTime) / totalSpan) * 100));
-
-              const activeLeft = Math.max(0, Math.min(100, ((startTime - firstPriceTime) / totalSpan) * 100));
-              const activeWidth = Math.max(0, Math.min(100 - activeLeft, ((endTime - startTime) / totalSpan) * 100));
-
-              // Colors
-              let colorBase = 'rgba(34, 197, 94, 0.2)';
-              let colorBorder = 'rgba(34, 197, 94, 0.6)';
-              let colorActive = 'rgba(34, 197, 94, 0.8)';
-              
-              if (device.type === 'Dryer') {
-                colorBase = 'rgba(56, 189, 248, 0.2)';
-                colorBorder = 'rgba(56, 189, 248, 0.6)';
-                colorActive = 'rgba(56, 189, 248, 0.8)';
-              } else if (device.type === 'Dishwasher') {
-                colorBase = 'rgba(249, 115, 22, 0.2)';
-                colorBorder = 'rgba(249, 115, 22, 0.6)';
-                colorActive = 'rgba(249, 115, 22, 0.8)';
-              }
-
-              return (
-                <div key={device.id} className="gantt-row" style={{ display: 'flex', alignItems: 'center', position: 'relative', height: '1.5rem' }}>
-                  <div style={{ position: 'absolute', left: 0, right: 0, height: '2px', background: 'rgba(148, 163, 184, 0.2)', top: '50%', transform: 'translateY(-50%)' }}></div>
-                  <div style={{ position: 'relative', width: '100%', height: '1rem' }}>
-                    {/* Earliest to Latest bar */}
-                    {isScheduledOrRunning && seq?.earliestStartTime && (
-                      <>
-                        <div className="tooltip-trigger" style={{ position: 'absolute', left: `${flexLeft}%`, width: `${flexWidth}%`, height: '100%', background: colorBase, borderRadius: '0.125rem', border: `1px solid ${colorBorder}`, cursor: 'pointer' }}>
-                          <div className="gantt-tooltip">
-                            <div style={{ fontWeight: 'bold', color: '#38bdf8', marginBottom: '0.25rem' }}>{device.name} Flexibility</div>
-                            <div>Earliest: {new Date(seq.earliestStartTime).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})}</div>
-                            <div>Latest: {new Date(seq.latestEndTime).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})}</div>
-                          </div>
-                        </div>
-                        {/* Start to End bar with custom Power Profile tooltip */}
-                        {seq.startTime && (
-                          <div className="tooltip-trigger" style={{ position: 'absolute', left: `${activeLeft}%`, width: `${activeWidth}%`, height: '100%', background: colorActive, borderRadius: '0.125rem', cursor: 'pointer' }}>
-                            <div className="gantt-tooltip" style={{ minWidth: '400px', padding: '1.5rem' }}>
-                              <div style={{ fontWeight: 'bold', color: '#fbbf24', marginBottom: '0.75rem', fontSize: '1rem' }}>{device.name} Power Profile</div>
-                              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '120px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.2)', marginBottom: '0.5rem' }}>
-
-                                {deviceSlots.map((slot: any, idx: number) => {
-                                  const heightPercent = Math.max(10, (slot.powerConsumptionW / maxW) * 100);
-                                  const widthPercent = (slot.durationMinutes / totalMins) * 100;
-                                  return (
-                                    <div 
-                                      key={idx} 
-                                      style={{ 
-                                        width: `${widthPercent}%`, 
-                                        height: `${heightPercent}%`, 
-                                        background: '#fbbf24', 
-                                        borderRadius: '2px 2px 0 0' 
-                                      }} 
-                                      title={`${slot.powerConsumptionW}W`}
-                                    />
-                                  );
-                                })}
-
-                            </div>
-
-
-                              <div style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem' }}>
-                                <span>0 min</span>
-                                <span>Peak: {powerTimeSlots[device.id]?.slots ? Math.max(...powerTimeSlots[device.id].slots.map((s: any) => s.powerConsumptionW)) : 0}W</span>
-                                <span>{device.programDurationMinutes}m</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Legend */}
-            <div className="gantt-legend" style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-              {devices.map(device => {
-                let colorActive = 'rgba(34, 197, 94, 0.8)';
-                if (device.type === 'Dryer') colorActive = 'rgba(56, 189, 248, 0.8)';
-                if (device.type === 'Dishwasher') colorActive = 'rgba(249, 115, 22, 0.8)';
-
-                return (
-                  <div key={`legend-${device.id}`} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: colorActive, padding: '0.25rem 0.75rem', borderRadius: '0.25rem', color: 'white', fontSize: '0.75rem', fontWeight: 600 }}>
-                    {device.name}
-                  </div>
-                );
-              })}
+                <button 
+                  onClick={() => handleDateChange(1)}
+                  style={{
+                    background: 'rgba(255,255,255,0.1)',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '1.1rem',
+                    transition: 'all 0.2s ease'
+                  }}
+                  title="Tag vorwärts"
+                >
+                  &gt;
+                </button>
+              </div>
             </div>
-          </div>
         </section>
+
+
+
+
+
+
 
         {/* Spine Devices Section */}
         {viewMode === 'developer' && (
@@ -1315,250 +1406,22 @@ function App() {
         <p>&copy; 2026 SunShift EMS | Smart Energy. Perfect Timing. | v{packageJson.version}</p>
 
       </footer>
-      {isLogsDetached && (
+      <FloatingPanels 
+        isLogsDetached={isLogsDetached}
+        setIsLogsDetached={setIsLogsDetached}
+        apiLogs={apiLogs}
+        tickerPos={tickerPos}
+        setTickerDragging={setTickerDragging}
+        setTickerRel={setTickerRel}
+        callbackPos={callbackPos}
+        setCallbackDragging={setCallbackDragging}
+        setCallbackRel={setCallbackRel}
+        logPos={logPos}
+        setDragging={setDragging}
+        setRel={setRel}
+      />
 
-        <>
-          {/* System Ticker Window */}
-          <div 
-            style={{ 
-              position: 'fixed', 
-              left: `${tickerPos.x}px`, 
-              top: `${tickerPos.y}px`, 
-              width: '450px', 
-              height: '500px',
-              minWidth: '300px',
-              minHeight: '200px',
-              background: 'rgba(15, 23, 42, 0.95)', 
-              backdropFilter: 'blur(12px)', 
-              color: '#f1f5f9', 
-              border: '1px solid rgba(168, 85, 247, 0.3)', 
-              borderRadius: '0.75rem', 
-              padding: '1rem', 
-              boxShadow: '0 10px 25px rgba(0,0,0,0.5)', 
-              zIndex: 10000, 
-              display: 'flex', 
-              flexDirection: 'column',
-              resize: 'both',
-              overflow: 'hidden'
-            }}
-          >
-            <div 
-              style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                paddingBottom: '0.75rem', 
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                cursor: 'move',
-                userSelect: 'none'
-              }}
-              onMouseDown={(e) => {
-                setTickerDragging(true);
-                setTickerRel({
-                  x: e.clientX - tickerPos.x,
-                  y: e.clientY - tickerPos.y
-                });
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ width: '8px', height: '8px', background: '#a855f7', borderRadius: '50%', display: 'inline-block' }}></span>
-                <h3 style={{ fontSize: '1rem', color: '#f1f5f9', margin: 0 }}>System Ticker Narrative</h3>
-              </div>
-            </div>
-            
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0', fontFamily: 'sans-serif', fontSize: '0.85rem' }}>
-              {apiLogs.filter(log => log.method === 'STORY').map(log => {
-                let displayContent = log.response;
-                try {
-                  const parsed = JSON.parse(log.response);
-                  if (typeof parsed === 'string') displayContent = parsed;
-                } catch (_) {}
 
-                return (
-                  <div key={log.id} style={{ 
-                    marginBottom: '0.75rem', 
-                    padding: '0.75rem', 
-                    background: 'rgba(168, 85, 247, 0.12)', 
-                    borderRadius: '0.5rem',
-                    border: '1px solid rgba(168, 85, 247, 0.25)'
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#a855f7', fontWeight: 'bold', marginBottom: '0.25rem' }}>
-                      <span>✨ {log.endpoint}</span>
-                      <span style={{ color: '#64748b', fontSize: '0.75rem' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                    <pre style={{ whiteSpace: 'pre-wrap', color: '#f1f5f9', margin: 0, fontSize: '0.85rem', lineHeight: 1.5 }}>
-                      {displayContent}
-                    </pre>
-                  </div>
-                );
-              })}
-              {apiLogs.filter(log => log.method === 'STORY').length === 0 && (
-                <p style={{ color: '#64748b', textAlign: 'center', marginTop: '2rem' }}>Warte auf System-Ereignisse...</p>
-              )}
-            </div>
-          </div>
-
-          {/* Callback Log Window */}
-          <div 
-            style={{ 
-              position: 'fixed', 
-              left: `${callbackPos.x}px`, 
-              top: `${callbackPos.y}px`, 
-              width: '400px', 
-              height: '500px',
-              background: 'rgba(15, 23, 42, 0.95)', 
-              backdropFilter: 'blur(12px)', 
-              color: '#f1f5f9', 
-              border: '1px solid rgba(34, 197, 94, 0.3)', 
-              borderRadius: '0.75rem', 
-              padding: '1rem', 
-              boxShadow: '0 10px 25px rgba(0,0,0,0.5)', 
-              zIndex: 10001, 
-              display: 'flex', 
-              flexDirection: 'column',
-              resize: 'both',
-              overflow: 'hidden'
-            }}
-          >
-            <div 
-              style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                paddingBottom: '0.75rem', 
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                cursor: 'move',
-                userSelect: 'none'
-              }}
-              onMouseDown={(e) => {
-                setCallbackDragging(true);
-                setCallbackRel({
-                  x: e.clientX - callbackPos.x,
-                  y: e.clientY - callbackPos.y
-                });
-
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ width: '8px', height: '8px', background: '#22c55e', borderRadius: '50%', display: 'inline-block' }}></span>
-                <h3 style={{ fontSize: '1rem', color: '#f1f5f9', margin: 0 }}>SPINE Webhook Callbacks</h3>
-              </div>
-            </div>
-
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-              {apiLogs.filter(log => log.endpoint === '/api/spine/callback').map(log => {
-                let payloadStr = log.response;
-                try {
-                  if (typeof log.response !== 'string') {
-                    payloadStr = JSON.stringify(log.response, null, 2);
-                  }
-                } catch (_) {}
-
-                return (
-                  <div key={log.id} style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.25rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', color: '#22c55e', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                      <span>📥 Webhook Received</span>
-                      <span style={{ color: '#64748b' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
-                    </div>
-                    <pre style={{ whiteSpace: 'pre-wrap', color: '#94a3b8', margin: '0.25rem 0 0 0', fontSize: '0.75rem' }}>
-                      {payloadStr}
-                    </pre>
-                  </div>
-                );
-              })}
-              {apiLogs.filter(log => log.endpoint === '/api/spine/callback').length === 0 && (
-                <p style={{ color: '#64748b', textAlign: 'center', marginTop: '2rem' }}>Warte auf SPINE Callbacks...</p>
-              )}
-            </div>
-          </div>
-
-          {/* API Activity Window */}
-          <div 
-            style={{ 
-
-              position: 'fixed', 
-              left: `${logPos.x}px`, 
-              top: `${logPos.y}px`, 
-              width: '400px', 
-              height: '500px',
-              minWidth: '250px',
-              minHeight: '200px',
-              background: 'rgba(15, 23, 42, 0.95)', 
-              backdropFilter: 'blur(12px)', 
-              color: '#f1f5f9', 
-              border: '1px solid rgba(56, 189, 248, 0.3)', 
-              borderRadius: '0.75rem', 
-              padding: '1rem', 
-              boxShadow: '0 10px 25px rgba(0,0,0,0.5)', 
-              zIndex: 10002, 
-              display: 'flex', 
-              flexDirection: 'column',
-              resize: 'both',
-              overflow: 'hidden'
-            }}
-          >
-            <div 
-              style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                paddingBottom: '0.75rem', 
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                cursor: 'move',
-                userSelect: 'none'
-              }}
-              onMouseDown={(e) => {
-                setDragging(true);
-                setRel({
-                  x: e.clientX - logPos.x,
-                  y: e.clientY - logPos.y
-                });
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span style={{ width: '8px', height: '8px', background: '#38bdf8', borderRadius: '50%', display: 'inline-block' }}></span>
-                <h3 style={{ fontSize: '1rem', color: '#f1f5f9', margin: 0 }}>Live API Activity</h3>
-              </div>
-              <button 
-                type="button"
-                onClick={() => setIsLogsDetached(false)}
-                style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', border: 'none', width: '24px', height: '24px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold' }}
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-              {apiLogs.filter(log => log.method !== 'STORY').map(log => {
-                let displayContent = log.response;
-                try {
-                  const parsed = JSON.parse(log.response);
-                  if (typeof parsed === 'string') displayContent = parsed;
-                  else displayContent = JSON.stringify(parsed, null, 2);
-                } catch (_) {}
-
-                return (
-                  <div key={log.id} style={{ 
-                    marginBottom: '0.5rem', 
-                    paddingBottom: '0.5rem', 
-                    borderBottom: '1px solid rgba(255,255,255,0.05)'
-                  }}>
-                    <span style={{ color: '#60a5fa' }}>[{new Date(log.timestamp).toLocaleTimeString()}] </span>
-                    <span style={{ color: '#34d399', fontWeight: 'bold' }}>{log.method} </span>
-                    <span style={{ color: '#fbbf24' }}>{log.endpoint}</span>
-                    <details style={{ marginTop: '0.25rem', color: '#94a3b8' }}>
-                      <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: '#38bdf8' }}>Payload</summary>
-                      <pre style={{ marginTop: '0.25rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.75rem', background: '#1e293b', color: '#e2e8f0', padding: '0.5rem', borderRadius: '0.25rem' }}>
-                        {displayContent}
-                      </pre>
-                    </details>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
     </div>
   );
 }

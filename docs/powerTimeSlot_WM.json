@@ -1,0 +1,41 @@
+[
+  {
+    "deviceId": "000186348553",
+    "entityId": 0,
+    "featureObjType": "powerTimeSlot",
+    "featureType": "PowerSequences",
+    "data": {
+      "sequenceId": 1,
+      "slotNumber": 0,
+      "defaultDuration": "PT7M27S",
+      "description": "",
+      "power": { "number": 50, "scale": 0 }
+    }
+  },
+  {
+    "deviceId": "000186348553",
+    "entityId": 0,
+    "featureObjType": "powerTimeSlot",
+    "featureType": "PowerSequences",
+    "data": {
+      "sequenceId": 1,
+      "slotNumber": 1,
+      "defaultDuration": "PT31M17S",
+      "description": "",
+      "power": { "number": 2100, "scale": 0 }
+    }
+  },
+  {
+    "deviceId": "000186348553",
+    "entityId": 0,
+    "featureObjType": "powerTimeSlot",
+    "featureType": "PowerSequences",
+    "data": {
+      "sequenceId": 1,
+      "slotNumber": 2,
+      "defaultDuration": "PT1H50M16S",
+      "description": "",
+      "power": { "number": 150, "scale": 0 }
+    }
+  }
+]

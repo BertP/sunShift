@@ -23,6 +23,8 @@ services:
       - MIELE_CLIENT_ID=${MIELE_CLIENT_ID}
       - MIELE_CLIENT_SECRET=${MIELE_CLIENT_SECRET}
       - FORECAST_SOLAR_API_KEY=${FORECAST_SOLAR_API_KEY}
+      - HA_LL_TOKEN=${HA_LL_TOKEN}
+
     depends_on:
       - db
     networks:

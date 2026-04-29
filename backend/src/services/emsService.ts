@@ -1,9 +1,11 @@
 import { getPrices } from './priceService';
 import { getSolarForecast } from './solarService';
 import { getMieleDevices, scheduleDevice, MieleDevice } from './mieleService';
+import { getPowerTimeSlot } from './spineService';
+
 
 export const runOptimization = async () => {
-  console.log('[emsService]: Running optimization cycle...');
+  console.log('[emsService]: Running optimization cycle V1 (POC 0.6)...');
   
   const devices = await getMieleDevices();
   const prices = await getPrices();
@@ -14,11 +16,23 @@ export const runOptimization = async () => {
     return;
   }
 
-  const readyDevices = devices.filter(d => d.status === 'READY');
+  // 5. Rescheduling is allowed (READY & SCHEDULED)
+  // 4. Prioritization: Dishwasher goes first
+  const optimizedDevices = devices.filter(d => d.status === 'READY' || d.status === 'SCHEDULED')
+    .sort((a, b) => {
+      const aIsDW = a.name.toLowerCase().includes('dishwasher') || a.name.toLowerCase().includes('spülmaschine');
+      const bIsDW = b.name.toLowerCase().includes('dishwasher') || b.name.toLowerCase().includes('spülmaschine');
+      return aIsDW ? -1 : (bIsDW ? 1 : 0);
+    });
 
-  for (const device of readyDevices) {
+  for (const device of optimizedDevices) {
+    // Always query PowerTimeSlots before scheduling
+    const timeSlotData = await getPowerTimeSlot(device.id);
+    console.log(`[emsService]: Fetched real-time slot constraints for ${device.name} (${timeSlotData.slots?.length || 0} phases)`);
+
     await optimizeDeviceSchedule(device, prices, solar);
   }
+
 };
 
 const optimizeDeviceSchedule = async (device: MieleDevice, prices: any[], solar: any[]) => {
@@ -35,13 +49,12 @@ const optimizeDeviceSchedule = async (device: MieleDevice, prices: any[], solar:
   let bestStartTime = now;
   let lowestCost = Infinity;
 
-  // Check slots every 30 minutes
-  for (let time = now.getTime(); time <= latestStart.getTime(); time += 30 * 60 * 1000) {
+  // Check slots every 15 minutes
+  for (let time = now.getTime(); time <= latestStart.getTime(); time += 15 * 60 * 1000) {
     const slotStart = new Date(time);
     const slotEnd = new Date(time + durationMs);
 
-    // Calculate cost for this slot
-    const cost = calculateSlotCost(slotStart, slotEnd, prices, solar);
+    const cost = calculateSlotCost(slotStart, slotEnd, prices, solar, device);
 
     if (cost < lowestCost) {
       lowestCost = cost;
@@ -49,35 +62,42 @@ const optimizeDeviceSchedule = async (device: MieleDevice, prices: any[], solar:
     }
   }
 
-  console.log(`[emsService]: Best slot for ${device.name} found: ${bestStartTime.toISOString()} with cost metric ${lowestCost}`);
+  console.log(`[emsService]: Best V1 slot for ${device.name} found: ${bestStartTime.toISOString()} with cost metric ${lowestCost}`);
   await scheduleDevice(device.id, bestStartTime);
 };
 
-const calculateSlotCost = (start: Date, end: Date, prices: any[], solar: any[]) => {
+const calculateSlotCost = (start: Date, end: Date, prices: any[], solar: any[], device: MieleDevice) => {
   let totalCost = 0;
 
-  // Average price in this slot
   const relevantPrices = prices.filter(p => {
     const pTime = new Date(p.timestamp);
     return pTime >= start && pTime <= end;
   });
 
+  // 3. Negative prices = Green Grid (low cost)
   if (relevantPrices.length > 0) {
     const avgPrice = relevantPrices.reduce((sum, p) => sum + p.price, 0) / relevantPrices.length;
     totalCost += avgPrice;
   }
 
-  // Factor in Solar (PV lowers cost)
   const relevantSolar = solar.filter(s => {
     const sTime = new Date(s.timestamp);
     return sTime >= start && sTime <= end;
   });
 
+  // 1 & 2. PV over Grid & CO2 reduction proxy
   if (relevantSolar.length > 0) {
     const totalSolarWattHours = relevantSolar.reduce((sum, s) => sum + s.watt_hours, 0);
-    // Arbitrary reduction: 1 kWh of PV saves 30 cents equivalent (or avoids high price)
-    totalCost -= (totalSolarWattHours / 1000) * 30; 
+    totalCost -= (totalSolarWattHours / 1000) * 50; 
+  }
+
+  // 4. Prioritize early completion for Dishwasher
+  const isDW = device.name.toLowerCase().includes('dishwasher') || device.name.toLowerCase().includes('spülmaschine');
+  if (isDW) {
+    const waitHours = (start.getTime() - Date.now()) / (1000 * 60 * 60);
+    totalCost += waitHours * 15; 
   }
 
   return totalCost;
 };
+

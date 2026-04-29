@@ -16,8 +16,9 @@ let mockDevices: MieleDevice[] = [
     name: 'Washer',
     type: 'Washer',
     status: 'READY',
-    programDurationMinutes: 90,
+    programDurationMinutes: 149,
     readyAt: new Date(Date.now() + 8 * 60 * 60 * 1000)
+
   },
   {
     id: '000091093524',
