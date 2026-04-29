@@ -17,10 +17,13 @@ import { getAccessToken } from './mieleAuthService';
 import axios from 'axios';
 
 const boundDevices = new Set<string>();
+const subscribedDevices = new Set<string>();
 
 export const clearBoundDevices = () => {
   boundDevices.clear();
+  subscribedDevices.clear();
 };
+
 
 export const getSpineDevices = async () => {
   // Load bound devices from DB
@@ -131,7 +134,7 @@ export const getSpineDevices = async () => {
 
     // Enforce Callback Subscriptions for all discovered devices
     for (const dev of liveDevices) {
-      if (!dev.id.startsWith('washer_') && !dev.id.startsWith('dryer_') && !dev.id.startsWith('dishwasher_')) {
+      if (!subscribedDevices.has(dev.id) && !dev.id.startsWith('washer_') && !dev.id.startsWith('dryer_') && !dev.id.startsWith('dishwasher_')) {
         try {
           console.log(`[spineService]: Ensuring callback subscription for device ${dev.id}...`);
           const subPayload = {
@@ -153,6 +156,7 @@ export const getSpineDevices = async () => {
             }
           });
           console.log(`[spineService]: Successfully created subscription for ${dev.id}`);
+          subscribedDevices.add(dev.id);
           addApiLog('POST', '/subscriptions', {
             statusCode: subRes.status,
             requestPayload: subPayload,
@@ -167,6 +171,7 @@ export const getSpineDevices = async () => {
         }
       }
     }
+
 
 
     // Resolve bindingId & expires using local DB and live API order fallback
