@@ -53,7 +53,17 @@ export const initDB = async () => {
         profile_slots JSONB NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+      CREATE TABLE IF NOT EXISTS dynamic_power_slots (
+        id SERIAL PRIMARY KEY,
+        device_id VARCHAR(255) NOT NULL,
+        slot_number INTEGER NOT NULL,
+        duration_minutes FLOAT NOT NULL,
+        power_w FLOAT NOT NULL,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(device_id, slot_number)
+      );
     `);
+
 
     console.log('[db]: Database tables initialized');
   } catch (err) {

@@ -124,36 +124,55 @@ app.get('/api/features/powerTimeSlot', async (req: Request, res: Response) => {
     const { deviceId } = req.query;
     if (!deviceId) return res.status(400).json({ error: 'deviceId required' });
     
-    let timeSlots: any[] = [
-      { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 500 },
-      { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1200 },
-      { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 1800 },
-      { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1000 }
-    ];
+    let timeSlots: any[] = [];
     
-    if (deviceId === '000186348553') { 
+    const dbSlots = await pool.query(
+      'SELECT slot_number, duration_minutes, power_w FROM dynamic_power_slots WHERE device_id = $1 ORDER BY slot_number ASC',
+      [deviceId]
+    );
+    
+    if (dbSlots.rows.length > 0) {
+      timeSlots = dbSlots.rows.map((r: any, idx: number) => ({
+        chunkIndex: idx,
+        durationMinutes: r.duration_minutes,
+        powerConsumptionW: r.power_w
+      }));
+    } else {
       timeSlots = [
-        { chunkIndex: 0, durationMinutes: 7.5, powerConsumptionW: 50 },
-        { chunkIndex: 1, durationMinutes: 31.3, powerConsumptionW: 2100 },
-        { chunkIndex: 2, durationMinutes: 110.25, powerConsumptionW: 150 }
-      ];
-    } else if (deviceId === '000105666767') { 
-      timeSlots = [
-        { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 150 },
-        { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1800 },
-        { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 2000 },
-        { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1200 },
-        { chunkIndex: 4, durationMinutes: 15, powerConsumptionW: 600 },
-        { chunkIndex: 5, durationMinutes: 15, powerConsumptionW: 800 },
-        { chunkIndex: 6, durationMinutes: 15, powerConsumptionW: 200 },
-        { chunkIndex: 7, durationMinutes: 15, powerConsumptionW: 50 }
-      ];
-    } else if (deviceId === '000091093524') { 
-      timeSlots = [
-        { chunkIndex: 0, durationMinutes: 10.2, powerConsumptionW: 300 },
-        { chunkIndex: 1, durationMinutes: 49.8, powerConsumptionW: 800 }
+        { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 500 },
+        { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1200 },
+        { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 1800 },
+        { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1000 }
       ];
     }
+
+    
+    if (dbSlots.rows.length === 0) {
+      if (deviceId === '000186348553') { 
+        timeSlots = [
+          { chunkIndex: 0, durationMinutes: 7.5, powerConsumptionW: 50 },
+          { chunkIndex: 1, durationMinutes: 31.3, powerConsumptionW: 2100 },
+          { chunkIndex: 2, durationMinutes: 110.25, powerConsumptionW: 150 }
+        ];
+      } else if (deviceId === '000105666767') { 
+        timeSlots = [
+          { chunkIndex: 0, durationMinutes: 15, powerConsumptionW: 150 },
+          { chunkIndex: 1, durationMinutes: 15, powerConsumptionW: 1800 },
+          { chunkIndex: 2, durationMinutes: 15, powerConsumptionW: 2000 },
+          { chunkIndex: 3, durationMinutes: 15, powerConsumptionW: 1200 },
+          { chunkIndex: 4, durationMinutes: 15, powerConsumptionW: 600 },
+          { chunkIndex: 5, durationMinutes: 15, powerConsumptionW: 800 },
+          { chunkIndex: 6, durationMinutes: 15, powerConsumptionW: 200 },
+          { chunkIndex: 7, durationMinutes: 15, powerConsumptionW: 50 }
+        ];
+      } else if (deviceId === '000091093524') { 
+        timeSlots = [
+          { chunkIndex: 0, durationMinutes: 10.2, powerConsumptionW: 300 },
+          { chunkIndex: 1, durationMinutes: 49.8, powerConsumptionW: 800 }
+        ];
+      }
+    }
+
 
 
     res.json({
@@ -412,9 +431,34 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
 
           }
         }
+
+        if ((item.featureObjType === 'powerTimeSlot') || (item.feature && item.feature.featureObjType === 'powerTimeSlot')) {
+          const slot = item.data || (item.feature && item.feature.data);
+          const deviceId = item.deviceId || (item.feature && item.feature.deviceId);
+          
+          if (deviceId && slot) {
+            let durationMins = 15;
+            if (slot.defaultDuration) {
+              const match = slot.defaultDuration.match(/PT(\d+)M/);
+              if (match) durationMins = parseFloat(match[1]);
+            }
+            const powerW = slot.power ? (typeof slot.power.number === 'number' ? slot.power.number : slot.power) : 0;
+            const slotNumber = typeof slot.slotNumber === 'number' ? slot.slotNumber : 0;
+
+            await pool.query(
+              `INSERT INTO dynamic_power_slots (device_id, slot_number, duration_minutes, power_w) 
+               VALUES ($1, $2, $3, $4) 
+               ON CONFLICT (device_id, slot_number) 
+               DO UPDATE SET duration_minutes = EXCLUDED.duration_minutes, power_w = EXCLUDED.power_w, updated_at = NOW()`,
+              [deviceId, slotNumber, durationMins, Number(powerW)]
+            );
+            console.log(`[spineCallback]: Logged dynamic time slot ${slotNumber} for ${deviceId} (${powerW} W)`);
+          }
+        }
       }
     }
     res.sendStatus(200);
+
   } catch (e: any) {
     console.error('[spineCallback]: Failed processing webhook:', e.message);
     res.sendStatus(500);
