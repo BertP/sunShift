@@ -118,41 +118,6 @@ export const getSpineDevices = async () => {
           const exp = bindRes.data?.expires || 'Unlimited';
           await pool.query('INSERT INTO device_bindings (device_id, binding_id, expires_at) VALUES ($1, $2, $3) ON CONFLICT (device_id) DO UPDATE SET binding_id = EXCLUDED.binding_id, expires_at = EXCLUDED.expires_at', [dev.id, bId, exp]);
           
-          // Create Callback Subscription
-          try {
-            console.log(`[spineService]: Creating callback subscription for device ${dev.id}...`);
-            const subPayload = {
-              callbackUrl: "https://sunshift.never2sunny.eu/api/spine/callback",
-              usecaseInterfaces: {
-                deviceId: dev.id,
-                entityId: 0,
-                usecaseName: "flexibleStartForWhiteGoods",
-                usecaseMajorVersion: "v1",
-                actor: "SmartAppliance"
-              }
-            };
-            
-            const subRes = await axios.post('https://ems.domestic.miele-iot.com/v1/subscriptions', subPayload, {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-              }
-            });
-            console.log(`[spineService]: Successfully created subscription for ${dev.id}`);
-            addApiLog('POST', '/subscriptions', {
-              statusCode: subRes.status,
-              requestPayload: subPayload,
-              responsePayload: subRes.data
-            });
-          } catch (subErr: any) {
-            console.error(`[spineService]: Failed to subscribe device ${dev.id}:`, subErr.response?.data || subErr.message);
-            addApiLog('POST', '/subscriptions [ERROR]', {
-              statusCode: subErr.response?.status || 500,
-              error: subErr.response?.data || subErr.message
-            });
-          }
-
         } catch (bindError: any) {
           console.error(`[spineService]: Failed to bind device ${dev.id}:`, bindError.response?.data || bindError.message);
           addApiLog('POST', '/bindings [ERROR]', {
@@ -163,6 +128,46 @@ export const getSpineDevices = async () => {
         }
       }
     }
+
+    // Enforce Callback Subscriptions for all discovered devices
+    for (const dev of liveDevices) {
+      if (!dev.id.startsWith('washer_') && !dev.id.startsWith('dryer_') && !dev.id.startsWith('dishwasher_')) {
+        try {
+          console.log(`[spineService]: Ensuring callback subscription for device ${dev.id}...`);
+          const subPayload = {
+            callbackUrl: "https://sunshift.never2sunny.eu/api/spine/callback",
+            usecaseInterfaces: {
+              deviceId: dev.id,
+              entityId: 0,
+              usecaseName: "flexibleStartForWhiteGoods",
+              usecaseMajorVersion: "v1",
+              actor: "SmartAppliance"
+            }
+          };
+          
+          const subRes = await axios.post('https://ems.domestic.miele-iot.com/v1/subscriptions', subPayload, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
+            }
+          });
+          console.log(`[spineService]: Successfully created subscription for ${dev.id}`);
+          addApiLog('POST', '/subscriptions', {
+            statusCode: subRes.status,
+            requestPayload: subPayload,
+            responsePayload: subRes.data
+          });
+        } catch (subErr: any) {
+          console.error(`[spineService]: Failed to subscribe device ${dev.id}:`, subErr.response?.data || subErr.message);
+          addApiLog('POST', '/subscriptions [ERROR]', {
+            statusCode: subErr.response?.status || 500,
+            error: subErr.response?.data || subErr.message
+          });
+        }
+      }
+    }
+
 
     // Resolve bindingId & expires using local DB and live API order fallback
     try {
