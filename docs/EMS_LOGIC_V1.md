@@ -18,3 +18,7 @@ curl -X GET "https://ems.domestic.miele-iot.com/v1/features/powerTimeSlot?device
      -H "Authorization: Bearer <token>"
 ```
 * **Nutzen**: Liefert präzise Energy Forecasts (geplante Stromaufnahmekurven) der Geräte für eine granularere Lastverteilung.
+
+## 4. Architektur-Entscheidungen (Q&A)
+* **CO2-Erfassung**: Es wird vorerst auf externe APIs verzichtet. Der CO2-Footprint wird direkt über die Peaks des PV-Forecasts sowie negative Preise (Überschuss-Indikator) abgeleitet.
+* **Deadlines**: Es gibt keine festen Endzeiten für Geräte (z.B. "Fertig bis 18:00 Uhr"). Die Logik platziert Lasten flexibel. *Erweiterung im Backlog vermerkt.*
