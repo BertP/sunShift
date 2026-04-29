@@ -96,8 +96,9 @@ function App() {
   const [viewMode, setViewMode] = useState<'customer' | 'developer'>('developer');
   const [showHelp, setShowHelp] = useState(false);
   const [isRebooting, setIsRebooting] = useState(false);
-  const [tickerPos, setTickerPos] = useState({ x: 50, y: window.innerHeight - 550 });
+  const [tickerPos, setTickerPos] = useState({ x: window.innerWidth - 450, y: 200 });
   const [tickerDragging, setTickerDragging] = useState(false);
+
   const [tickerRel, setTickerRel] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -121,7 +122,7 @@ function App() {
     };
   }, [tickerDragging, tickerRel]);
 
-  const [logPos, setLogPos] = useState({ x: window.innerWidth - 450, y: window.innerHeight - 550 });
+  const [logPos, setLogPos] = useState({ x: window.innerWidth - 550, y: 80 });
   const [dragging, setDragging] = useState(false);
   const [rel, setRel] = useState({ x: 0, y: 0 });
 
@@ -146,9 +147,10 @@ function App() {
     };
   }, [dragging, rel]);
   
-  const [callbackPos, setCallbackPos] = useState({ x: Math.floor(window.innerWidth / 2) - 200, y: Math.floor(window.innerHeight / 2) - 250 });
+  const [callbackPos, setCallbackPos] = useState({ x: window.innerWidth - 500, y: 140 });
   const [callbackDragging, setCallbackDragging] = useState(false);
   const [callbackRel, setCallbackRel] = useState({ x: 0, y: 0 });
+
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
@@ -1333,7 +1335,7 @@ function App() {
               borderRadius: '0.75rem', 
               padding: '1rem', 
               boxShadow: '0 10px 25px rgba(0,0,0,0.5)', 
-              zIndex: 9999, 
+              zIndex: 10000, 
               display: 'flex', 
               flexDirection: 'column',
               resize: 'both',
@@ -1411,7 +1413,7 @@ function App() {
               borderRadius: '0.75rem', 
               padding: '1rem', 
               boxShadow: '0 10px 25px rgba(0,0,0,0.5)', 
-              zIndex: 9999, 
+              zIndex: 10001, 
               display: 'flex', 
               flexDirection: 'column',
               resize: 'both',
@@ -1488,7 +1490,7 @@ function App() {
               borderRadius: '0.75rem', 
               padding: '1rem', 
               boxShadow: '0 10px 25px rgba(0,0,0,0.5)', 
-              zIndex: 9998, 
+              zIndex: 10002, 
               display: 'flex', 
               flexDirection: 'column',
               resize: 'both',
