@@ -22,3 +22,21 @@ curl -X GET "https://ems.domestic.miele-iot.com/v1/features/powerTimeSlot?device
 ## 4. Architektur-Entscheidungen (Q&A)
 * **CO2-Erfassung**: Es wird vorerst auf externe APIs verzichtet. Der CO2-Footprint wird direkt über die Peaks des PV-Forecasts sowie negative Preise (Überschuss-Indikator) abgeleitet.
 * **Deadlines**: Es gibt keine festen Endzeiten für Geräte (z.B. "Fertig bis 18:00 Uhr"). Die Logik platziert Lasten flexibel. *Erweiterung im Backlog vermerkt.*
+
+## 5. EMS Optimierungs-Workflow
+```mermaid
+graph TD
+    A[Start Optimization Cycle] --> B[Load Data: Prices, PV Forecast & Devices]
+    B --> C[Filter: Status == READY / SCHEDULED]
+    C --> D[Sort: Priority to Dishwasher]
+    D --> E{For each Device...}
+    E -->|Check Slots| F[Iterate 15-min slots until Latest Start]
+    F --> G[Calculate Slot Cost]
+    G --> H[Factor 1: Add Grid Price]
+    G --> I[Factor 2: Subtract PV Yield * 50]
+    G --> J[Factor 3: Dishwasher Penalty Factor]
+    H & I & J --> K[Identify Slot with Lowest Cost]
+    K --> L[Store Optimal Start in DB]
+    L --> E
+    E -->|Done| M[Push to GitHub / Frontend Update]
+```
