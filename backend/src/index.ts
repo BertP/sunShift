@@ -361,11 +361,23 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
           const seq = item.feature;
           const deviceId = seq.deviceId;
           if (deviceId && seq.data) {
+             const newState = seq.data.state ? seq.data.state.toUpperCase() : 'SCHEDULED';
              await pool.query(
                'UPDATE device_schedules SET status = $1, scheduled_start = $2, scheduled_end = $3 WHERE device_id = $4',
-               [seq.data.state ? seq.data.state.toUpperCase() : 'SCHEDULED', seq.data.startTime, seq.data.endTime, deviceId]
+               [newState, seq.data.startTime, seq.data.endTime, deviceId]
              );
-             console.log(`[spineCallback]: Updated ${deviceId} to ${seq.data.state}`);
+             console.log(`[spineCallback]: Updated ${deviceId} to ${newState}`);
+
+             if (newState === 'SCHEDULED' || newState === 'RUNNING') {
+               try {
+                 const { getPowerTimeSlot } = require('./services/spineService');
+                 await getPowerTimeSlot(deviceId);
+                 console.log(`[spineCallback]: Re-read Power Time Slots for ${deviceId}`);
+               } catch (ptsErr) {
+                 console.error(`[spineCallback]: Failed to interpret dynamic power time slots for ${deviceId}:`, ptsErr);
+               }
+             }
+
           }
         }
       }
