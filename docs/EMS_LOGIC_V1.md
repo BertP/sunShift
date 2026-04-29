@@ -11,6 +11,8 @@ Dieses Dokument definiert die algorithmischen Kernregeln zur intelligenten Taktu
 * **Dishwasher (Spülmaschine)**: Muss als allererstes Gerät fertiggestellt werden (höchste zeitliche Priorität).
 * **Persistenz des Flexibilitäts-Zeitraums**: Der vom Kunden definierte Rahmen (`earliestStartTime` bis `latestEndTime`) ist absolut bindend. Er wird durch lokale EMS-Kalkulationen weder verschoben noch verkürzt und bleibt persistent erhalten.
 * **Dynamisches Rescheduling**: Die Einschaltzeiten dürfen bei sich ändernden Wetter- oder Preiskurven innerhalb des Flex-Fensters jederzeit flexibel neu zugewiesen werden.
+* **PowerTimeSlot Abfrage**: Für jedes Gerät wird zwingend das zugehörige Lastprofil vor dem eigentlichen Scheduling abgerufen, um eine akkurate Leistungsverteilung zu garantieren.
+
 
 
 
@@ -33,7 +35,8 @@ graph TD
     B --> C[Filter: Status == READY / SCHEDULED]
     C --> D[Sort: Priority to Dishwasher]
     D --> E{For each Device...}
-    E -->|Check Slots| F[Iterate 15-min slots until Latest Start]
+    E -->|Query Profile| Z[Fetch powerTimeSlot from API]
+    Z --> F[Iterate 15-min slots until Latest Start]
     F --> G[Calculate Slot Cost]
     G --> H[Factor 1: Add Grid Price]
     G --> I[Factor 2: Subtract PV Yield * 50]
@@ -42,4 +45,5 @@ graph TD
     K --> L[Store Optimal Start in DB]
     L --> E
     E -->|Done| M[Push to GitHub / Frontend Update]
+
 ```
