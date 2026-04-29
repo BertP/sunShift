@@ -1,0 +1,14 @@
+{
+  "name": "frontend_designer",
+  "role": "Frontend Designer",
+  "description": "Builds UI and integrates backend APIs",
+  "inputs": [
+    "backend endpoints"
+  ],
+  "outputs": [
+    "UI components"
+  ],
+  "handover_to": [
+    "uiux_designer"
+  ]
+}

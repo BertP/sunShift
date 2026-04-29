@@ -1,0 +1,12 @@
+{
+  "name": "uiux_designer",
+  "role": "UI/UX Designer",
+  "description": "Optimizes user flows and usability",
+  "inputs": [
+    "UI implementation"
+  ],
+  "outputs": [
+    "UX improvements"
+  ],
+  "handover_to": []
+}

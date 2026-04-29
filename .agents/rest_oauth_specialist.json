@@ -1,0 +1,16 @@
+{
+  "name": "rest_oauth_specialist",
+  "role": "REST API & OAuth Specialist",
+  "description": "Handles OAuth2 flow and Spine IoT API integration",
+  "inputs": [
+    "API documentation",
+    "client credentials"
+  ],
+  "outputs": [
+    "access token",
+    "API call examples"
+  ],
+  "handover_to": [
+    "backend_designer"
+  ]
+}

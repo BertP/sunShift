@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: sunshift-db
+    environment:
+      POSTGRES_USER: sunshift
+      POSTGRES_PASSWORD: sunshift_secret_password
+      POSTGRES_DB: sunshift_ems
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    restart: always
+
+  backend:
+    build: ./backend
+    container_name: sunshift-backend
+    ports:
+      - "3010:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://sunshift:sunshift_secret_password@db:5432/sunshift_ems
+      - MIELE_CLIENT_ID=${MIELE_CLIENT_ID}
+      - MIELE_CLIENT_SECRET=${MIELE_CLIENT_SECRET}
+      - FORECAST_SOLAR_API_KEY=${FORECAST_SOLAR_API_KEY}
+    depends_on:
+      - db
+    networks:
+      - default
+      - proxy-net
+    restart: always
+
+  frontend:
+    build: ./frontend
+    container_name: sunshift-frontend
+    ports:
+      - "8091:80"
+    depends_on:
+      - backend
+    networks:
+      - default
+      - proxy-net
+    restart: always
+
+volumes:
+  pgdata:
+
+networks:
+  proxy-net:
+    external: true

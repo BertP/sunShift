@@ -1,0 +1,13 @@
+{
+  "name": "cicd_specialist",
+  "role": "CI/CD Specialist",
+  "description": "Handles deployment and Docker setup",
+  "inputs": [
+    "backend",
+    "frontend"
+  ],
+  "outputs": [
+    "docker-compose setup"
+  ],
+  "handover_to": []
+}

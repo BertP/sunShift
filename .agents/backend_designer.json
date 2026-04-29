@@ -1,0 +1,16 @@
+{
+  "name": "backend_designer",
+  "role": "Backend Designer",
+  "description": "Implements API client and backend services",
+  "inputs": [
+    "OAuth token",
+    "API endpoints"
+  ],
+  "outputs": [
+    "backend API",
+    "device endpoint"
+  ],
+  "handover_to": [
+    "frontend_designer"
+  ]
+}
