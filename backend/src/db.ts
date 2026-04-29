@@ -45,7 +45,16 @@ export const initDB = async () => {
       );
       ALTER TABLE device_bindings ADD COLUMN IF NOT EXISTS binding_id VARCHAR(255);
       ALTER TABLE device_bindings ADD COLUMN IF NOT EXISTS expires_at VARCHAR(255);
+      CREATE TABLE IF NOT EXISTS executed_runs (
+        id SERIAL PRIMARY KEY,
+        device_id VARCHAR(255) NOT NULL,
+        device_name VARCHAR(255) NOT NULL,
+        start_time TIMESTAMPTZ NOT NULL,
+        profile_slots JSONB NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
+
     console.log('[db]: Database tables initialized');
   } catch (err) {
     console.error('[db]: Database initialization failed', err);

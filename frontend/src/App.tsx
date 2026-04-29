@@ -68,7 +68,9 @@ function App() {
   const [isMieleConnected, setIsMieleConnected] = useState(false);
   const [powerSequences, setPowerSequences] = useState<Record<string, any>>({});
   const [powerTimeSlots, setPowerTimeSlots] = useState<Record<string, any>>({});
+  const [executedRuns, setExecutedRuns] = useState<any[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>('');
+
   const [telemetry, setTelemetry] = useState({ pvLeistung: 0, netzzustand: 0 });
 
 
@@ -168,6 +170,12 @@ function App() {
       }
       setPowerSequences(sequences);
       setPowerTimeSlots(slots);
+
+      try {
+        const runsRes = await axios.get('/api/executed-runs');
+        setExecutedRuns(runsRes.data);
+      } catch (runErr) {}
+
 
       
       // Fetch Spine Devices only if connected
@@ -331,29 +339,52 @@ function App() {
 
   const getDevicePowerAtTime = (device: any, time: Date): number => {
     if (!device) return 0;
+    let totalPower = 0;
+
+    // 1. Add live schedule curve
     const seq = powerSequences[device.id];
     const state = seq?.state || 'inactive';
-    if (!seq || !seq.startTime || (state !== 'scheduled' && state !== 'running')) return 0;
-
-    
-    const startMs = new Date(seq.startTime).getTime();
-    const currentMs = time.getTime();
-    
-    if (currentMs < startMs) return 0;
-
-    const slots = powerTimeSlots[device.id]?.slots || [];
-    let currentOffsetMs = 0;
-
-    for (const slot of slots) {
-      const slotDurationMs = slot.durationMinutes * 60 * 1000;
-      if (currentMs >= (startMs + currentOffsetMs) && currentMs < (startMs + currentOffsetMs + slotDurationMs)) {
-        return slot.powerConsumptionW;
+    if (seq && seq.startTime && (state === 'scheduled' || state === 'running')) {
+      const startMs = new Date(seq.startTime).getTime();
+      const currentMs = time.getTime();
+      
+      if (currentMs >= startMs) {
+        const slots = powerTimeSlots[device.id]?.slots || [];
+        let currentOffsetMs = 0;
+        for (const slot of slots) {
+          const slotDurationMs = slot.durationMinutes * 60 * 1000;
+          if (currentMs >= (startMs + currentOffsetMs) && currentMs < (startMs + currentOffsetMs + slotDurationMs)) {
+            totalPower += slot.powerConsumptionW;
+            break;
+          }
+          currentOffsetMs += slotDurationMs;
+        }
       }
-      currentOffsetMs += slotDurationMs;
     }
-    
-    return 0;
+
+    // 2. Add persistent executed runs
+    const deviceRuns = executedRuns.filter(r => r.device_id === device.id);
+    for (const run of deviceRuns) {
+      const startMs = new Date(run.start_time).getTime();
+      const currentMs = time.getTime();
+      
+      if (currentMs >= startMs) {
+        const slots = Array.isArray(run.profile_slots) ? run.profile_slots : [];
+        let currentOffsetMs = 0;
+        for (const slot of slots) {
+          const slotDurationMs = slot.durationMinutes * 60 * 1000;
+          if (currentMs >= (startMs + currentOffsetMs) && currentMs < (startMs + currentOffsetMs + slotDurationMs)) {
+            totalPower += slot.powerConsumptionW;
+            break;
+          }
+          currentOffsetMs += slotDurationMs;
+        }
+      }
+    }
+
+    return totalPower;
   };
+
 
   // Chart Data
 

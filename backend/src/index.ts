@@ -104,6 +104,14 @@ app.get('/api/features/powerSequence', async (req: Request, res: Response) => {
     }
 
     res.json(sequenceData);
+app.get('/api/executed-runs', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT * FROM executed_runs ORDER BY id DESC');
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -335,7 +343,20 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
       responsePayload: response.data
     });
 
+    try {
+      const { getPowerTimeSlot } = require('./services/spineService');
+      const slotsData = await getPowerTimeSlot(id);
+      await pool.query(
+        "INSERT INTO executed_runs (device_id, device_name, start_time, profile_slots) VALUES ($1, $2, $3, $4)",
+        [id, 'Miele Device', startTime, JSON.stringify(slotsData.slots)]
+      );
+      console.log(`[server]: Pinned executed run profile for manual start of ${id}`);
+    } catch (runErr) {
+      console.error(`[server]: Failed to pin profile for manual start of ${id}:`, runErr);
+    }
+
     res.json({ success: true, message: `Device ${id} start command dispatched.`, cloudData: response.data });
+
   } catch (err: any) {
     console.error('[server]: Failed to send start command to Miele Cloud:', err.response?.data || err.message);
     addApiLog('POST', '/usecaseInterfaces/flexibleStartForWhiteGoods/v1 [ERROR]', {
@@ -371,12 +392,21 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
              if (newState === 'SCHEDULED' || newState === 'RUNNING') {
                try {
                  const { getPowerTimeSlot } = require('./services/spineService');
-                 await getPowerTimeSlot(deviceId);
+                 const slotsData = await getPowerTimeSlot(deviceId);
                  console.log(`[spineCallback]: Re-read Power Time Slots for ${deviceId}`);
+
+                 if (newState === 'RUNNING') {
+                   await pool.query(
+                     "INSERT INTO executed_runs (device_id, device_name, start_time, profile_slots) VALUES ($1, $2, $3, $4)",
+                     [deviceId, 'Miele Device', seq.data.startTime || new Date().toISOString(), JSON.stringify(slotsData.slots)]
+                   );
+                   console.log(`[spineCallback]: Pinned executed run profile for ${deviceId}`);
+                 }
                } catch (ptsErr) {
                  console.error(`[spineCallback]: Failed to interpret dynamic power time slots for ${deviceId}:`, ptsErr);
                }
              }
+
 
           }
         }
