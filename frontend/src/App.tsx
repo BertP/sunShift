@@ -8,8 +8,11 @@ import {
   Settings,
   HelpCircle,
   Cloud,
-  CloudOff
+  CloudOff,
+  Home,
+  Zap
 } from 'lucide-react';
+
 import { Chart as ChartJS, registerables } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
 
@@ -59,7 +62,11 @@ function App() {
   const [configMessage, setConfigMessage] = useState('');
   const [isMieleConnected, setIsMieleConnected] = useState(false);
   const [powerSequences, setPowerSequences] = useState<Record<string, any>>({});
+  const [powerTimeSlots, setPowerTimeSlots] = useState<Record<string, any>>({});
   const [lastUpdated, setLastUpdated] = useState<string>('');
+  const [telemetry, setTelemetry] = useState({ pvLeistung: 0, netzzustand: 0 });
+
+
   const chartRef = useRef<any>(null);
 
   const [apiLogs, setApiLogs] = useState<any[]>([]);
@@ -127,16 +134,22 @@ function App() {
       setDevices(response.data.devices);
       
       const sequences: Record<string, any> = {};
+      const slots: Record<string, any> = {};
 
       for (const d of response.data.devices) {
         try {
           const seqRes = await axios.get(`/api/features/powerSequence?deviceId=${d.id}`);
           sequences[d.id] = seqRes.data;
+          
+          const slotRes = await axios.get(`/api/features/powerTimeSlot?deviceId=${d.id}`);
+          slots[d.id] = slotRes.data;
         } catch (e: any) {
-          console.error(`Failed to fetch sequence for ${d.id}`, e);
+          console.error(`Failed to fetch profile for ${d.id}`, e);
         }
       }
       setPowerSequences(sequences);
+      setPowerTimeSlots(slots);
+
       
       // Fetch Spine Devices only if connected
       if (isMieleConnected) {
@@ -227,8 +240,23 @@ function App() {
   };
 
   useEffect(() => {
+    const fetchTelemetry = async () => {
+      try {
+        const res = await axios.get('/api/telemetry');
+        setTelemetry(res.data);
+      } catch (e) {
+        console.error('Failed to fetch telemetry', e);
+      }
+    };
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     // Check URL params for connection status
     const urlParams = new URLSearchParams(window.location.search);
+
     const connectedParam = urlParams.get('connected');
     
     const checkStatus = async () => {
@@ -264,11 +292,45 @@ function App() {
     return () => clearInterval(interval);
   }, [isMieleConnected]);
 
+  const getDevicePowerAtTime = (device: any, time: Date): number => {
+    if (!device) return 0;
+    const seq = powerSequences[device.id];
+    if (!seq || !seq.startTime) return 0;
+    
+    const startMs = new Date(seq.startTime).getTime();
+    const currentMs = time.getTime();
+    
+    if (currentMs < startMs) return 0;
+
+    const slots = powerTimeSlots[device.id]?.slots || [];
+    let currentOffsetMs = 0;
+
+    for (const slot of slots) {
+      const slotDurationMs = slot.durationMinutes * 60 * 1000;
+      if (currentMs >= (startMs + currentOffsetMs) && currentMs < (startMs + currentOffsetMs + slotDurationMs)) {
+        return slot.powerConsumptionW;
+      }
+      currentOffsetMs += slotDurationMs;
+    }
+    
+    return 0;
+  };
+
   // Chart Data
+
   // Expand Price to 15-minute chunks
   const expandedLabels: string[] = [];
   const expandedSolar: number[] = [];
   const expandedPrices: number[] = [];
+
+  const washerPower: number[] = [];
+  const dryerPower: number[] = [];
+  const dishwasherPower: number[] = [];
+
+  const washerDevice = devices.find(d => d.name.toLowerCase().includes('washer') || d.name.toLowerCase().includes('waschmaschine'));
+  const dryerDevice = devices.find(d => d.name.toLowerCase().includes('dryer') || d.name.toLowerCase().includes('trockner'));
+  const dishwasherDevice = devices.find(d => d.name.toLowerCase().includes('dishwasher') || d.name.toLowerCase().includes('spülmaschine'));
+
   
   prices.forEach((p) => {
     const baseTime = new Date(p.timestamp);
@@ -288,7 +350,12 @@ function App() {
       // Linear chunk interpolation
       const chunkVal = currentSolar + ((nextSolar - currentSolar) * (chunk / 4));
       expandedSolar.push(chunkVal);
+
+      washerPower.push(getDevicePowerAtTime(washerDevice, chunkTime));
+      dryerPower.push(getDevicePowerAtTime(dryerDevice, chunkTime));
+      dishwasherPower.push(getDevicePowerAtTime(dishwasherDevice, chunkTime));
     }
+
   });
 
   const chartData = {
@@ -315,7 +382,38 @@ function App() {
         yAxisID: 'y1',
         pointRadius: 0,
         pointHitRadius: 10,
+      },
+      {
+        type: 'bar' as const,
+        label: 'Washer Forecast (W)',
+        data: washerPower,
+        borderColor: 'rgba(34, 197, 94, 0.8)',
+        backgroundColor: 'rgba(34, 197, 94, 0.6)',
+        borderWidth: 1,
+        yAxisID: 'y1',
+        stack: 'appliances',
+      },
+      {
+        type: 'bar' as const,
+        label: 'Dryer Forecast (W)',
+        data: dryerPower,
+        borderColor: 'rgba(56, 189, 248, 0.8)',
+        backgroundColor: 'rgba(56, 189, 248, 0.6)',
+        borderWidth: 1,
+        yAxisID: 'y1',
+        stack: 'appliances',
+      },
+      {
+        type: 'bar' as const,
+        label: 'Dishwasher Forecast (W)',
+        data: dishwasherPower,
+        borderColor: 'rgba(249, 115, 22, 0.8)',
+        backgroundColor: 'rgba(249, 115, 22, 0.6)',
+        borderWidth: 1,
+        yAxisID: 'y1',
+        stack: 'appliances',
       }
+
     ]
   };
 
@@ -417,7 +515,31 @@ function App() {
           <Sun className="icon-sun" />
           <h1>SunShift <span>EMS</span></h1>
         </div>
+
+        {/* Option 1: Dynamic Power Flow Widget */}
+        <div className="power-flow-widget" style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1.5rem', borderRadius: '2rem', border: '1px solid rgba(255,255,255,0.1)', margin: '0 auto 0 2rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Sun style={{ color: '#fbbf24', width: 20, height: 20 }} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#fbbf24' }}>{telemetry.pvLeistung} W</span>
+          </div>
+          <div style={{ width: 40, height: 2, background: 'rgba(255,255,255,0.2)', position: 'relative' }}>
+            <div style={{ position: 'absolute', width: 6, height: 6, background: '#fbbf24', borderRadius: '50%', top: -2, left: '50%', transform: 'translateX(-50%)' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Home style={{ color: '#38bdf8', width: 20, height: 20 }} />
+            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Haus</span>
+          </div>
+          <div style={{ width: 40, height: 2, background: 'rgba(255,255,255,0.2)', position: 'relative' }}>
+            <div style={{ position: 'absolute', width: 6, height: 6, background: '#38bdf8', borderRadius: '50%', top: -2, left: '50%', transform: 'translateX(-50%)' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 20, height: 20 }} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand} W</span>
+          </div>
+        </div>
+
         <div className="header-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+
           <div className="mode-toggle" style={{ display: 'flex', background: 'rgba(0,0,0,0.05)', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid rgba(0,0,0,0.1)' }}>
             <button 
               onClick={() => setViewMode('customer')} 
@@ -700,6 +822,24 @@ function App() {
       )}
 
       <main className="dashboard-grid">
+        {/* Option 2: Glassmorphism KPI Cards as Top Tile */}
+        <div className="telemetry-kpi-strip" style={{ gridColumn: '1 / -1', display: 'flex', gap: '1.5rem', marginBottom: '1.5rem' }}>
+          <div className="glass-card" style={{ flex: 1, background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.2)', padding: '1.5rem', borderRadius: '1rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <Sun style={{ color: '#fbbf24', width: 48, height: 48 }} />
+            <div>
+              <div style={{ fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Live PV-Leistung</div>
+              <div style={{ fontSize: '2.25rem', fontWeight: 'bold', color: '#fbbf24', lineHeight: 1.2 }}>{telemetry.pvLeistung} W</div>
+            </div>
+          </div>
+          <div className="glass-card" style={{ flex: 1, background: telemetry.netzzustand < 0 ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)', border: telemetry.netzzustand < 0 ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid rgba(248, 113, 113, 0.2)', padding: '1.5rem', borderRadius: '1rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+            <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 48, height: 48 }} />
+            <div>
+              <div style={{ fontSize: '0.85rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>{telemetry.netzzustand < 0 ? 'Live Netzeinspeisung' : 'Live Netzbezug'}</div>
+              <div style={{ fontSize: '2.25rem', fontWeight: 'bold', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', lineHeight: 1.2 }}>{Math.abs(telemetry.netzzustand)} W</div>
+            </div>
+          </div>
+        </div>
+
         {/* Chart Section */}
         <section className="glass-card chart-card">
           <h2>Energy & Price Forecast for {prices.length ? new Date(prices[0].timestamp).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'}) : new Date().toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit', year: 'numeric'})} {lastUpdated && `(last Update: ${lastUpdated})`}</h2>
@@ -708,7 +848,9 @@ function App() {
           </div>
 
           {/* Gantt Chart Schedules directly aligned under graph */}
+
           <div id="gantt-chart-container" className="gantt-chart" style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem', boxSizing: 'border-box' }}>
+
             {devices.map((device) => {
               const firstPriceTime = prices.length ? new Date(prices[0].timestamp).getTime() : Date.now();
               const totalSpan = 24 * 60 * 60 * 1000;
@@ -721,7 +863,12 @@ function App() {
               const startTime = seq && seq.startTime ? new Date(seq.startTime).getTime() : earliestTime;
               const endTime = seq && seq.endTime ? new Date(seq.endTime).getTime() : earliestTime;
 
+              const deviceSlots = powerTimeSlots[device.id]?.slots || [];
+              const totalMins = deviceSlots.reduce((acc: number, s: any) => acc + s.durationMinutes, 0) || 1;
+              const maxW = Math.max(...deviceSlots.map((s: any) => s.powerConsumptionW), 1);
+
               // Calculate Percentages
+
               const flexLeft = Math.max(0, Math.min(100, ((earliestTime - firstPriceTime) / totalSpan) * 100));
               const flexWidth = Math.max(0, Math.min(100 - flexLeft, ((latestTime - earliestTime) / totalSpan) * 100));
 
@@ -757,10 +904,42 @@ function App() {
                             <div>Latest: {new Date(seq.latestEndTime).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})}</div>
                           </div>
                         </div>
-                        {/* Start to End bar */}
+                        {/* Start to End bar with custom Power Profile tooltip */}
                         {seq.startTime && (
-                          <div style={{ position: 'absolute', left: `${activeLeft}%`, width: `${activeWidth}%`, height: '100%', background: colorActive, borderRadius: '0.125rem' }}></div>
+                          <div className="tooltip-trigger" style={{ position: 'absolute', left: `${activeLeft}%`, width: `${activeWidth}%`, height: '100%', background: colorActive, borderRadius: '0.125rem', cursor: 'pointer' }}>
+                            <div className="gantt-tooltip" style={{ minWidth: '400px', padding: '1.5rem' }}>
+                              <div style={{ fontWeight: 'bold', color: '#fbbf24', marginBottom: '0.75rem', fontSize: '1rem' }}>{device.name} Power Profile</div>
+                              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '6px', height: '120px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.2)', marginBottom: '0.5rem' }}>
+
+                                {deviceSlots.map((slot: any, idx: number) => {
+                                  const heightPercent = Math.max(10, (slot.powerConsumptionW / maxW) * 100);
+                                  const widthPercent = (slot.durationMinutes / totalMins) * 100;
+                                  return (
+                                    <div 
+                                      key={idx} 
+                                      style={{ 
+                                        width: `${widthPercent}%`, 
+                                        height: `${heightPercent}%`, 
+                                        background: '#fbbf24', 
+                                        borderRadius: '2px 2px 0 0' 
+                                      }} 
+                                      title={`${slot.powerConsumptionW}W`}
+                                    />
+                                  );
+                                })}
+
+                            </div>
+
+
+                              <div style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem' }}>
+                                <span>0 min</span>
+                                <span>Peak: {powerTimeSlots[device.id]?.slots ? Math.max(...powerTimeSlots[device.id].slots.map((s: any) => s.powerConsumptionW)) : 0}W</span>
+                                <span>{device.programDurationMinutes}m</span>
+                              </div>
+                            </div>
+                          </div>
                         )}
+
                       </>
                     )}
                   </div>
