@@ -13,8 +13,9 @@ Dieses Dokument beschreibt die Integration von Home Assistant zur Erfassung von 
   * Senden des HA Long-Lived Access Tokens.
 - [x] **Schritt 3: State Subscription**
   * Überwachung von:
-    * `sensor.pv_power` (Aktuelle Solarerzeugung in W)
-    * `sensor.grid_power` (Netzbezug/-einspeisung in W)
+    * `sensor.pv_leistung` (Aktuelle Solarerzeugung in W)
+    * `sensor.netzzustand` (Netzbezug/-einspeisung in W)
+
 
 - [ ] **Schritt 4: EMS Logic Hook**
   * Echtzeit-Triggerung des Reschedulings bei starken Leistungs-Fluktuationen.
