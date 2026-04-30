@@ -7,7 +7,9 @@
     "entities": {
       "pvPower": "sensor.pv_leistung",
       "gridPower": "sensor.netzzustand",
-      "evChargingPower": "sensor.smaev_3011444125_charging_station_power"
+      "evChargingPower": "sensor.smaev_3011444125_charging_station_power",
+      "batteryLevel": "sensor.sb_battery_level",
+      "batteryChargingState": "sensor.ladezustand_pv_batterie"
     }
   },
   "solarPlant": {

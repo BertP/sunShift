@@ -76,15 +76,22 @@ const handleTelemetryEvent = (event: any) => {
     const newState = event.data.new_state;
 
     const entities = getConfig().homeAssistant.entities;
-    if (entityId === entities.pvPower || entityId === entities.gridPower || entityId === entities.evChargingPower) {
-      const value = parseFloat(newState?.state);
-      console.log(`[homeAssistantService]: ${entityId} updated to ${value} W`);
+    if (entityId === entities.pvPower || 
+        entityId === entities.gridPower || 
+        entityId === entities.evChargingPower ||
+        entityId === entities.batteryLevel ||
+        entityId === entities.batteryChargingState) {
+        
+      const value = newState?.state;
+      const numValue = parseFloat(value);
       
-      if (!isNaN(value)) {
-        if (entityId === entities.pvPower) updateTelemetry(value, null, null);
-        if (entityId === entities.gridPower) updateTelemetry(null, value, null);
-        if (entityId === entities.evChargingPower) updateTelemetry(null, null, value);
-      }
+      console.log(`[homeAssistantService]: ${entityId} updated to ${value}`);
+      
+      if (entityId === entities.pvPower && !isNaN(numValue)) updateTelemetry(numValue, null, null);
+      if (entityId === entities.gridPower && !isNaN(numValue)) updateTelemetry(null, numValue, null);
+      if (entityId === entities.evChargingPower && !isNaN(numValue)) updateTelemetry(null, null, numValue);
+      if (entityId === entities.batteryLevel && !isNaN(numValue)) updateTelemetry(null, null, null, numValue);
+      if (entityId === entities.batteryChargingState) updateTelemetry(null, null, null, undefined, value);
     }
 
 

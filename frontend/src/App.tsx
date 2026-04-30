@@ -10,7 +10,11 @@ import {
   Cloud,
   CloudOff,
   Home,
-  Zap
+  Zap,
+  Battery,
+  BatteryCharging,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 import { Chart as ChartJS, registerables } from 'chart.js';
@@ -76,7 +80,13 @@ function App() {
   const [executedRuns, setExecutedRuns] = useState<any[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string>('');
 
-  const [telemetry, setTelemetry] = useState({ pvLeistung: 0, netzzustand: 0, eUpPower: 0 });
+  const [telemetry, setTelemetry] = useState({ 
+    pvLeistung: 0, 
+    netzzustand: 0, 
+    eUpPower: 0,
+    batteryLevel: 0,
+    batteryState: 'idle'
+  });
 
 
 
@@ -98,6 +108,7 @@ function App() {
 
 
   const chartRef = useRef<any>(null);
+  const [isMonitoringExpanded, setIsMonitoringExpanded] = useState(false);
 
 
   const [apiLogs, setApiLogs] = useState<any[]>([]);
@@ -757,28 +768,6 @@ function App() {
           <h1>SunShift <span>EMS</span></h1>
         </div>
 
-        {/* Option 1: Dynamic Power Flow Widget */}
-        <div className="power-flow-widget" style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1.5rem', borderRadius: '2rem', border: '1px solid rgba(255,255,255,0.1)', margin: '0 auto 0 2rem' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Sun style={{ color: '#fbbf24', width: 20, height: 20 }} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#fbbf24' }}>{telemetry.pvLeistung} W</span>
-          </div>
-          <div style={{ width: 40, height: 2, background: 'rgba(255,255,255,0.2)', position: 'relative' }}>
-            <div style={{ position: 'absolute', width: 6, height: 6, background: '#fbbf24', borderRadius: '50%', top: -2, left: '50%', transform: 'translateX(-50%)' }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Home style={{ color: '#38bdf8', width: 20, height: 20 }} />
-            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Haus</span>
-          </div>
-          <div style={{ width: 40, height: 2, background: 'rgba(255,255,255,0.2)', position: 'relative' }}>
-            <div style={{ position: 'absolute', width: 6, height: 6, background: '#38bdf8', borderRadius: '50%', top: -2, left: '50%', transform: 'translateX(-50%)' }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 20, height: 20 }} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand} W</span>
-          </div>
-        </div>
-
         <div className="header-actions" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
 
           <div className="mode-toggle" style={{ display: 'flex', background: 'rgba(0,0,0,0.05)', padding: '0.25rem', borderRadius: '0.5rem', border: '1px solid rgba(0,0,0,0.1)' }}>
@@ -1304,12 +1293,80 @@ function App() {
               </div>
             </div>
         </section>
+        {/* Monitoring Section */}
+        <section className="glass-card monitoring-card" style={{ marginBottom: '2rem' }}>
+          <div 
+            onClick={() => setIsMonitoringExpanded(!isMonitoringExpanded)}
+            style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+          >
+            <h2 style={{ margin: 0 }}>Monitoring</h2>
+            {isMonitoringExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+          </div>
 
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-around', 
+            marginTop: '1.5rem',
+            padding: '1rem',
+            background: 'rgba(255,255,255,0.03)',
+            borderRadius: '1rem',
+            border: '1px solid rgba(255,255,255,0.05)'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <Sun style={{ color: '#fbbf24', width: 28, height: 28 }} />
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>PV ERTRAG</span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24' }}>{telemetry.pvLeistung} W</span>
+            </div>
+            
+            <div style={{ width: '2px', height: '40px', background: 'rgba(255,255,255,0.1)' }} />
 
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <Home style={{ color: '#38bdf8', width: 28, height: 28 }} />
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>HAUSVERBRAUCH</span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#38bdf8' }}>Haus</span>
+            </div>
 
+            <div style={{ width: '2px', height: '40px', background: 'rgba(255,255,255,0.1)' }} />
 
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+              <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 28, height: 28 }} />
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>NETZSTATUS</span>
+              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand} W</span>
+            </div>
+          </div>
 
+          {isMonitoringExpanded && (
+            <div style={{ 
+              marginTop: '1.5rem', 
+              paddingTop: '1.5rem', 
+              borderTop: '1px solid rgba(255,255,255,0.1)',
+              display: 'flex',
+              justifyContent: 'space-around',
+              animation: 'fadeIn 0.3s ease-out'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <Battery style={{ color: '#4ade80', width: 28, height: 28 }} />
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>BATTERY LEVEL</span>
+                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
+              </div>
 
+              <div style={{ width: '2px', height: '40px', background: 'rgba(255,255,255,0.1)' }} />
+
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <BatteryCharging style={{ color: '#fbbf24', width: 28, height: 28 }} />
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>CHARGING STATE</span>
+                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}</span>
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Spine Devices Section */}
         {viewMode === 'developer' && (
