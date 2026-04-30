@@ -1112,9 +1112,145 @@ function App() {
       )}
 
       <main className="dashboard-grid">
-        {/* Chart Section */}
+        {/* SunShift EMS Header Tile */}
+        <section className="glass-card ems-header-card" style={{ 
+          gridColumn: '1 / -1', 
+          padding: '1.5rem 2rem', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '0' 
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <Sun style={{ color: '#fbbf24', width: 32, height: 32 }} />
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, border: 'none', padding: 0 }}>SunShift <span style={{ color: '#38bdf8' }}>EMS</span></h2>
+          </div>
+          <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.1em' }}>SYSTEM STATUS</span>
+              <span style={{ color: '#4ade80', fontWeight: 700, fontSize: '0.85rem' }}>● OPERATIONAL</span>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.1em' }}>LAST UPDATE</span>
+              <span style={{ color: '#f1f5f9', fontWeight: 600, fontSize: '0.85rem' }}>{new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})}</span>
+            </div>
+          </div>
+        </section>
 
-        <section className="glass-card chart-card">
+        {/* Energy Dashboard (formerly Monitoring) */}
+        <section className="glass-card monitoring-card" style={{ 
+          gridColumn: '1 / -1', 
+          marginBottom: '0',
+          padding: isMonitoringExpanded ? '2rem' : '1.5rem 2rem'
+        }}>
+          <div 
+            onClick={() => setIsMonitoringExpanded(!isMonitoringExpanded)}
+            style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+          >
+            <h2 style={{ margin: 0, border: 'none', padding: 0, fontSize: '1.25rem' }}>Energy Dashboard</h2>
+            
+            {!isMonitoringExpanded && (
+              <div style={{ 
+                display: 'flex', 
+                gap: '2.5rem', 
+                alignItems: 'center',
+                margin: '0 auto 0 3rem',
+                animation: 'fadeIn 0.4s ease-out'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Sun size={18} style={{ color: '#fbbf24' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#fbbf24' }}>{telemetry.pvLeistung}W</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Home size={18} style={{ color: '#38bdf8' }} />
+                  <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#94a3b8' }}>Haus</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Zap size={18} style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand}W</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Battery size={18} style={{ color: '#4ade80' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <BatteryCharging size={18} style={{ color: '#fbbf24' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}</span>
+                </div>
+              </div>
+            )}
+
+            {isMonitoringExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+          </div>
+
+          {isMonitoringExpanded && (
+            <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-around', 
+                marginTop: '1.5rem',
+                padding: '1.5rem',
+                background: 'rgba(255,255,255,0.03)',
+                borderRadius: '1rem',
+                border: '1px solid rgba(255,255,255,0.05)'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                  <Sun style={{ color: '#fbbf24', width: 32, height: 32 }} />
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>PV ERTRAG</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24' }}>{telemetry.pvLeistung} W</span>
+                </div>
+                
+                <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                  <Home style={{ color: '#38bdf8', width: 32, height: 32 }} />
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>HAUSVERBRAUCH</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8' }}>Haus</span>
+                </div>
+
+                <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                  <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 32, height: 32 }} />
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>NETZSTATUS</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand} W</span>
+                </div>
+              </div>
+
+              <div style={{ 
+                marginTop: '1.5rem', 
+                paddingTop: '1.5rem', 
+                borderTop: '1px solid rgba(255,255,255,0.1)',
+                display: 'flex',
+                justifyContent: 'space-around'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                  <Battery style={{ color: '#4ade80', width: 32, height: 32 }} />
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>BATTERY LEVEL</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
+                </div>
+
+                <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                  <BatteryCharging style={{ color: '#fbbf24', width: 32, height: 32 }} />
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>CHARGING STATE</span>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Chart Section */}
+        <section className="glass-card chart-card" style={{ gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ margin: 0 }}>
               {viewType === 'forecast' ? 'Energy & Price Forecast' : 'Live Power Analytics'} for {selectedDate ? new Date(selectedDate).toLocaleDateString('de-DE') : new Date().toLocaleDateString('de-DE')} {lastUpdated && `(last Update: ${lastUpdated})`}
@@ -1293,80 +1429,7 @@ function App() {
               </div>
             </div>
         </section>
-        {/* Monitoring Section */}
-        <section className="glass-card monitoring-card" style={{ marginBottom: '2rem' }}>
-          <div 
-            onClick={() => setIsMonitoringExpanded(!isMonitoringExpanded)}
-            style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              cursor: 'pointer',
-              userSelect: 'none'
-            }}
-          >
-            <h2 style={{ margin: 0 }}>Monitoring</h2>
-            {isMonitoringExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-          </div>
 
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'space-around', 
-            marginTop: '1.5rem',
-            padding: '1rem',
-            background: 'rgba(255,255,255,0.03)',
-            borderRadius: '1rem',
-            border: '1px solid rgba(255,255,255,0.05)'
-          }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-              <Sun style={{ color: '#fbbf24', width: 28, height: 28 }} />
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>PV ERTRAG</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24' }}>{telemetry.pvLeistung} W</span>
-            </div>
-            
-            <div style={{ width: '2px', height: '40px', background: 'rgba(255,255,255,0.1)' }} />
-
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-              <Home style={{ color: '#38bdf8', width: 28, height: 28 }} />
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>HAUSVERBRAUCH</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#38bdf8' }}>Haus</span>
-            </div>
-
-            <div style={{ width: '2px', height: '40px', background: 'rgba(255,255,255,0.1)' }} />
-
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-              <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 28, height: 28 }} />
-              <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>NETZSTATUS</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 800, color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand} W</span>
-            </div>
-          </div>
-
-          {isMonitoringExpanded && (
-            <div style={{ 
-              marginTop: '1.5rem', 
-              paddingTop: '1.5rem', 
-              borderTop: '1px solid rgba(255,255,255,0.1)',
-              display: 'flex',
-              justifyContent: 'space-around',
-              animation: 'fadeIn 0.3s ease-out'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                <Battery style={{ color: '#4ade80', width: 28, height: 28 }} />
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>BATTERY LEVEL</span>
-                <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
-              </div>
-
-              <div style={{ width: '2px', height: '40px', background: 'rgba(255,255,255,0.1)' }} />
-
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                <BatteryCharging style={{ color: '#fbbf24', width: 28, height: 28 }} />
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600 }}>CHARGING STATE</span>
-                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}</span>
-              </div>
-            </div>
-          )}
-        </section>
 
         {/* Spine Devices Section */}
         {viewMode === 'developer' && (
