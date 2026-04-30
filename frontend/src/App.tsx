@@ -15,8 +15,8 @@ import {
   BatteryCharging,
   ChevronDown,
   ChevronUp,
-  Thermometer,
-  Car
+  Car,
+  Fan
 } from 'lucide-react';
 
 import { Chart as ChartJS, registerables } from 'chart.js';
@@ -1143,7 +1143,7 @@ function App() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Sun size={16} style={{ color: '#fbbf24' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fbbf24' }}>{telemetry.pvLeistung}W</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fbbf24' }}>{Math.round(telemetry.pvLeistung)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Home size={16} style={{ color: '#38bdf8' }} />
@@ -1151,23 +1151,23 @@ function App() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Zap size={16} style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand}W</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{Math.round(telemetry.netzzustand)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Battery size={16} style={{ color: '#4ade80' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#4ade80' }}>{Math.round(telemetry.batteryLevel)}%</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Car size={16} style={{ color: '#38bdf8' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#38bdf8' }}>{telemetry.eUpPower}W</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#38bdf8' }}>{Math.round(telemetry.eUpPower)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Thermometer size={16} style={{ color: '#f472b6' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f472b6' }}>{telemetry.heatPumpPower}W</span>
+                  <Fan size={16} style={{ color: '#f472b6' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f472b6' }}>{Math.round(telemetry.heatPumpPower)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <BatteryCharging size={16} style={{ color: '#fbbf24' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.75rem', color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.75rem', color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}{!isNaN(parseFloat(telemetry.batteryState)) ? '%' : ''}</span>
                 </div>
               </div>
             )}
@@ -1192,7 +1192,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
                   <Sun style={{ color: '#fbbf24', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>PV ERTRAG</span>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24' }}>{telemetry.pvLeistung} W</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24' }}>{Math.round(telemetry.pvLeistung)} W</span>
                 </div>
                 
                 <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
@@ -1208,7 +1208,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
                   <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>NETZSTATUS</span>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand} W</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{Math.round(telemetry.netzzustand)} W</span>
                 </div>
 
                 <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
@@ -1216,15 +1216,15 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
                   <Car style={{ color: '#38bdf8', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>E-AUTO</span>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8' }}>{telemetry.eUpPower} W</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8' }}>{Math.round(telemetry.eUpPower)} W</span>
                 </div>
 
                 <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
 
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
-                  <Thermometer style={{ color: '#f472b6', width: 32, height: 32 }} />
+                  <Fan style={{ color: '#f472b6', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>WÄRMEPUMPE</span>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f472b6' }}>{telemetry.heatPumpPower} W</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f472b6' }}>{Math.round(telemetry.heatPumpPower)} W</span>
                 </div>
               </div>
 
@@ -1238,7 +1238,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                   <Battery style={{ color: '#4ade80', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>BATTERY LEVEL</span>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#4ade80' }}>{Math.round(telemetry.batteryLevel)}%</span>
                 </div>
 
                 <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
@@ -1246,7 +1246,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                   <BatteryCharging style={{ color: '#fbbf24', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>CHARGING STATE</span>
-                  <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}</span>
+                  <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}{!isNaN(parseFloat(telemetry.batteryState)) ? '%' : ''}</span>
                 </div>
               </div>
             </div>
