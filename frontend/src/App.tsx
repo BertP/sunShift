@@ -1168,7 +1168,7 @@ function App() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <BatteryCharging size={16} style={{ color: '#fbbf24' }} />
                   <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#fbbf24', textTransform: 'uppercase' }}>
-                    {telemetry.batteryState}{!isNaN(parseFloat(telemetry.batteryState)) ? '%' : ''}
+                    {isNaN(parseFloat(telemetry.batteryState)) ? telemetry.batteryState : `${Math.round(parseFloat(telemetry.batteryState))}W`}
                   </span>
                 </div>
               </div>
@@ -1247,9 +1247,9 @@ function App() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                   <BatteryCharging style={{ color: '#fbbf24', width: 32, height: 32 }} />
-                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>CHARGING STATE</span>
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>BATTERY POWER</span>
                   <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase' }}>
-                    {telemetry.batteryState}{!isNaN(parseFloat(telemetry.batteryState)) ? '%' : ''}
+                    {isNaN(parseFloat(telemetry.batteryState)) ? telemetry.batteryState : `${Math.round(parseFloat(telemetry.batteryState))} W`}
                   </span>
                 </div>
               </div>
