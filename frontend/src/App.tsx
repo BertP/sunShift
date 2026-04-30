@@ -15,7 +15,8 @@ import {
   BatteryCharging,
   ChevronDown,
   ChevronUp,
-  Thermometer
+  Thermometer,
+  Car
 } from 'lucide-react';
 
 import { Chart as ChartJS, registerables } from 'chart.js';
@@ -1157,6 +1158,10 @@ function App() {
                   <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Car size={16} style={{ color: '#38bdf8' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#38bdf8' }}>{telemetry.eUpPower}W</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Thermometer size={16} style={{ color: '#f472b6' }} />
                   <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f472b6' }}>{telemetry.heatPumpPower}W</span>
                 </div>
@@ -1204,6 +1209,14 @@ function App() {
                   <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>NETZSTATUS</span>
                   <span style={{ fontSize: '1.5rem', fontWeight: 800, color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand} W</span>
+                </div>
+
+                <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
+                  <Car style={{ color: '#38bdf8', width: 32, height: 32 }} />
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>E-AUTO</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8' }}>{telemetry.eUpPower} W</span>
                 </div>
 
                 <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
