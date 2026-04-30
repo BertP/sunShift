@@ -490,25 +490,42 @@ function App() {
     }
   });
 
-  const liveChartData = {
+  // Build live data aligned with the 15‑minute forecast grid
+  const livePvData = new Array(expandedLabels.length).fill(null);
+  const liveGridData = new Array(expandedLabels.length).fill(null);
 
-    labels: liveHistory.map((pt: any) => new Date(pt.timestamp).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'})),
+  // Map each live point to its corresponding 15‑minute slot
+  liveHistory.forEach((pt: any) => {
+    const d = new Date(pt.timestamp);
+    const hour = d.getHours();
+    const minute = d.getMinutes();
+    const slotIdx = hour * 4 + Math.floor(minute / 15);
+    if (slotIdx < livePvData.length) {
+      livePvData[slotIdx] = pt.pv_power_w;
+      liveGridData[slotIdx] = pt.grid_power_w;
+    }
+  });
+
+  const liveChartData = {
+    labels: expandedLabels,
     datasets: [
       {
         label: 'PV Ertrag (W)',
-        data: liveHistory.map((pt: any) => pt.pv_power_w),
+        data: livePvData,
         borderColor: '#fbbf24',
         backgroundColor: 'rgba(251, 189, 36, 0.1)',
         tension: 0.4,
-        fill: true
+        fill: true,
+        spanGaps: true // Connect the dots even if some slots are missing
       },
       {
         label: 'Netzstatus (W)',
-        data: liveHistory.map((pt: any) => pt.grid_power_w),
+        data: liveGridData,
         borderColor: '#38bdf8',
         backgroundColor: 'rgba(56, 189, 248, 0.1)',
         tension: 0.4,
-        fill: true
+        fill: true,
+        spanGaps: true
       }
     ]
   };
@@ -529,7 +546,7 @@ function App() {
       },
       x: {
         grid: { color: 'rgba(255,255,255,0.05)' },
-        ticks: { color: '#94a3b8', maxTicksLimit: 12 }
+        ticks: { color: '#94a3b8', maxTicksLimit: 96 }
       }
     }
   };
