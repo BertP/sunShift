@@ -75,13 +75,31 @@ app.get('/api/dashboard', async (req: Request, res: Response) => {
       });
     }
 
+    const powerSequences: Record<string, any> = {};
+    const powerTimeSlots: Record<string, any> = {};
+
+    for (const dev of devices) {
+      try {
+        const seq = await getPowerSequence(dev.id);
+        if (seq) powerSequences[dev.id] = seq;
+      } catch (_) {}
+
+      try {
+        const slots = await getPowerTimeSlot(dev.id);
+        if (slots) powerTimeSlots[dev.id] = slots;
+      } catch (_) {}
+    }
+
     res.json({
       prices: alignedPrices,
       solar: alignedSolar,
       devices,
       schedules: schedulesResult.rows,
-      telemetry: liveTelemetry
+      telemetry: liveTelemetry,
+      powerSequences,
+      powerTimeSlots
     });
+
 
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -108,7 +126,8 @@ app.get('/api/telemetry-history', async (req: Request, res: Response) => {
 });
 
 
-import { getSpineDevices, configureSpineApi, getPowerSequence } from './services/spineService';
+import { getSpineDevices, configureSpineApi, getPowerSequence, getPowerTimeSlot } from './services/spineService';
+
 
 app.get('/api/features/powerSequence', async (req: Request, res: Response) => {
   try {
@@ -207,7 +226,8 @@ import { exchangeCodeForToken, isConnected, disconnectMiele, loadTokensFromDB } 
 
 app.post('/api/miele/connect', (req: Request, res: Response) => {
   const clientId = process.env.MIELE_CLIENT_ID || '';
-  const redirectUri = 'https://sunshift.never2sunny.eu/api/miele/callback';
+  const { getConfig } = require('./services/configService');
+  const redirectUri = `${getConfig().system.baseUrl}/api/miele/callback`;
   const scope = 'openid mcs_energy_management';
   
   const authUrl = `https://auth.domestic.miele-iot.com/partner/realms/mcs/protocol/openid-connect/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code`;
@@ -217,20 +237,22 @@ app.post('/api/miele/connect', (req: Request, res: Response) => {
 
 app.get('/api/miele/callback', async (req: Request, res: Response) => {
   const { code, error, error_description } = req.query;
+  const { getConfig } = require('./services/configService');
+  const baseUrl = getConfig().system.baseUrl;
   
   if (error) {
-    return res.redirect(`https://sunshift.never2sunny.eu/?connected=false&error=${encodeURIComponent(error as string)}`);
+    return res.redirect(`${baseUrl}/?connected=false&error=${encodeURIComponent(error as string)}`);
   }
   
   if (!code) {
-    return res.redirect('https://sunshift.never2sunny.eu/?connected=false&error=no_code_provided');
+    return res.redirect(`${baseUrl}/?connected=false&error=no_code_provided`);
   }
   
   try {
     await exchangeCodeForToken(code as string);
-    res.redirect('https://sunshift.never2sunny.eu/?connected=true');
+    res.redirect(`${baseUrl}/?connected=true`);
   } catch (err: any) {
-    res.redirect(`https://sunshift.never2sunny.eu/?connected=false&error=${encodeURIComponent(err.message)}`);
+    res.redirect(`${baseUrl}/?connected=false&error=${encodeURIComponent(err.message)}`);
   }
 });
 
@@ -502,12 +524,12 @@ setInterval(async () => {
   await runOptimization();
 }, 24 * 60 * 60 * 1000);
 
-// Periodic PV Forecast Sync (every 60 minutes)
+// Periodic PV Forecast Sync (every 15 minutes)
 setInterval(async () => {
-  console.log('[cron]: Running hourly PV forecast sync...');
+  console.log('[cron]: Running 15-minute PV forecast sync...');
   await fetchAndStoreSolarForecast();
   await runOptimization();
-}, 60 * 60 * 1000);
+}, 15 * 60 * 1000);
 
 
 // Initial Sync after startup

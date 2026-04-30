@@ -26,9 +26,12 @@ export const runOptimization = async () => {
     });
 
   for (const device of optimizedDevices) {
-    // Always query PowerTimeSlots before scheduling
-    const timeSlotData = await getPowerTimeSlot(device.id);
-    console.log(`[emsService]: Fetched real-time slot constraints for ${device.name} (${timeSlotData.slots?.length || 0} phases)`);
+    try {
+      const timeSlotData = await getPowerTimeSlot(device.id);
+      console.log(`[emsService]: Fetched real-time slot constraints for ${device.name} (${timeSlotData.slots?.length || 0} phases)`);
+    } catch (err: any) {
+      console.log(`[emsService]: Warning: Could not fetch real-time slot constraints for ${device.name}: ${err.message}`);
+    }
 
     await optimizeDeviceSchedule(device, prices, solar);
   }

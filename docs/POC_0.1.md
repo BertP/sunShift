@@ -8,7 +8,7 @@ Dieses Dokument dokumentiert den aktuellen Stand der Entwicklung (Phase 1 MVP) n
 * **Datenbank**: PostgreSQL auf Port `5435`
 
 ## 2. Features in v0.1
-* **Dashboard**: Visualisierung von Strompreisen (Awattar) und PV-Erträgen (Forecast.Solar).
+* **Dashboard**: Visualisierung von Strompreisen (Awattar) und PV-Erträgen (Open-Meteo).
 * **Geräte-Steuerung**: Simulation von Miele-Geräten (Waschmaschine, Trockner, Geschirrspüler).
 * **Optimierung**: Erste Version des Algorithmus zur Kostenminimierung ist aktiv.
 

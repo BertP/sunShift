@@ -3,8 +3,9 @@ import dotenv from 'dotenv';
 import { updateTelemetry } from './telemetryStore';
 dotenv.config();
 
+import { getConfig } from './configService';
 
-const HA_URL = 'wss://home.never2sunny.eu/api/websocket';
+const HA_URL = getConfig().homeAssistant.url;
 const HA_TOKEN = process.env.HA_LL_TOKEN || '';
 
 let ws: WebSocket | null = null;
@@ -74,14 +75,15 @@ const handleTelemetryEvent = (event: any) => {
     const entityId = event.data.entity_id;
     const newState = event.data.new_state;
 
-    if (entityId === 'sensor.pv_leistung' || entityId === 'sensor.netzzustand' || entityId === 'sensor.smaev_3011444125_charging_station_power') {
+    const entities = getConfig().homeAssistant.entities;
+    if (entityId === entities.pvPower || entityId === entities.gridPower || entityId === entities.evChargingPower) {
       const value = parseFloat(newState?.state);
       console.log(`[homeAssistantService]: ${entityId} updated to ${value} W`);
       
       if (!isNaN(value)) {
-        if (entityId === 'sensor.pv_leistung') updateTelemetry(value, null, null);
-        if (entityId === 'sensor.netzzustand') updateTelemetry(null, value, null);
-        if (entityId === 'sensor.smaev_3011444125_charging_station_power') updateTelemetry(null, null, value);
+        if (entityId === entities.pvPower) updateTelemetry(value, null, null);
+        if (entityId === entities.gridPower) updateTelemetry(null, value, null);
+        if (entityId === entities.evChargingPower) updateTelemetry(null, null, value);
       }
     }
 

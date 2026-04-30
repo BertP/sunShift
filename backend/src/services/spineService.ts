@@ -139,8 +139,9 @@ export const getSpineDevices = async () => {
       if (!subscribedDevices.has(dev.id) && !dev.id.startsWith('washer_') && !dev.id.startsWith('dryer_') && !dev.id.startsWith('dishwasher_')) {
         try {
           console.log(`[spineService]: Ensuring callback subscription for device ${dev.id}...`);
+          const { getConfig } = require('./configService');
           const subPayload = {
-            callbackUrl: "https://sunshift.never2sunny.eu/api/spine/callback",
+            callbackUrl: `${getConfig().system.baseUrl}/api/spine/callback`,
             usecaseInterfaces: {
               deviceId: dev.id,
               entityId: 0,

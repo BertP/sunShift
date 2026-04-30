@@ -10,6 +10,35 @@ Ein intelligentes Energiemanagement-System zur automatischen Taktung von Haushal
 * **Optimierte API Zyklen**: Reduzierung interner Polling-Overheads auf EEBUS/Miele Spine-Netzwerkgrenzen.
 
 
+## Konfiguration
+
+Das System ist vollständig über eine zentrale Datei `sunshift-config.json` im Hauptverzeichnis konfigurierbar. Diese Datei steuert die Base-URLs, Home Assistant Sensoren und die Eigenschaften deiner PV-Anlage (z. B. mehrere Dachflächen, kWp, Neigung). 
+
+Beispiel für `sunshift-config.json`:
+```json
+{
+  "system": {
+    "baseUrl": "https://sunshift.deine-domain.de"
+  },
+  "homeAssistant": {
+    "url": "wss://homeassistant.local:8123/api/websocket",
+    "entities": {
+      "pvPower": "sensor.pv_leistung",
+      "gridPower": "sensor.netzzustand",
+      "evChargingPower": "sensor.wallbox_power"
+    }
+  },
+  "solarPlant": {
+    "location": { "lat": 51.9, "lon": 8.4 },
+    "arrays": [
+      { "name": "Ost", "dec": 45, "az": -90, "kwp": 4.0 },
+      { "name": "West", "dec": 45, "az": 90, "kwp": 6.0 }
+    ]
+  }
+}
+```
+Die Datei wird beim Start automatisch als Volume in den Backend-Container eingebunden.
+
 ## Deployment & Setup
 
 ### Voraussetzungen

@@ -63,7 +63,8 @@ export const exchangeCodeForToken = async (code: string) => {
   const tokenUrl = 'https://auth.domestic.miele-iot.com/partner/realms/mcs/protocol/openid-connect/token';
   const clientId = process.env.MIELE_CLIENT_ID;
   const clientSecret = process.env.MIELE_CLIENT_SECRET;
-  const redirectUri = 'https://sunshift.never2sunny.eu/api/miele/callback';
+  const { getConfig } = require('./configService');
+  const redirectUri = `${getConfig().system.baseUrl}/api/miele/callback`;
 
   try {
     const response = await axios.post(

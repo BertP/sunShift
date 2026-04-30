@@ -22,8 +22,11 @@ services:
       - DATABASE_URL=postgresql://sunshift:sunshift_secret_password@db:5432/sunshift_ems
       - MIELE_CLIENT_ID=${MIELE_CLIENT_ID}
       - MIELE_CLIENT_SECRET=${MIELE_CLIENT_SECRET}
-      - FORECAST_SOLAR_API_KEY=${FORECAST_SOLAR_API_KEY}
+
       - HA_LL_TOKEN=${HA_LL_TOKEN}
+    volumes:
+      - ./sunshift-config.json:/app/sunshift-config.json
+
 
     depends_on:
       - db
@@ -33,7 +36,9 @@ services:
     restart: always
 
   frontend:
-    build: ./frontend
+    build: 
+      context: .
+      dockerfile: ./frontend/Dockerfile
     container_name: sunshift-frontend
     ports:
       - "8091:80"

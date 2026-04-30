@@ -1,0 +1,33 @@
+{
+  "system": {
+    "baseUrl": "https://sunshift.never2sunny.eu"
+  },
+  "homeAssistant": {
+    "url": "wss://home.never2sunny.eu/api/websocket",
+    "entities": {
+      "pvPower": "sensor.pv_leistung",
+      "gridPower": "sensor.netzzustand",
+      "evChargingPower": "sensor.smaev_3011444125_charging_station_power"
+    }
+  },
+  "solarPlant": {
+    "location": {
+      "lat": 51.9,
+      "lon": 8.4
+    },
+    "arrays": [
+      {
+        "name": "Ost",
+        "dec": 45,
+        "az": -90,
+        "kwp": 4.0
+      },
+      {
+        "name": "West",
+        "dec": 45,
+        "az": 90,
+        "kwp": 6.0
+      }
+    ]
+  }
+}

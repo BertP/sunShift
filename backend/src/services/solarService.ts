@@ -1,28 +1,60 @@
 import axios from 'axios';
 import pool from '../db';
 
-// Default coordinates for PLZ 33335 (Gütersloh area)
-const LAT = 51.9;
-const LON = 8.4;
-const DEC = 35; // Declination
-const AZ = 0; // Azimuth (0 is South in Forecast.Solar? Wait, 0 is South, -90 East, 90 West)
-const KWP = 10; // 10 kWp system
+import { getConfig } from './configService';
 
 export const fetchAndStoreSolarForecast = async () => {
   try {
     const apiKey = process.env.FORECAST_SOLAR_API_KEY;
-    const url = apiKey 
-      ? `https://api.forecast.solar/${apiKey}/estimate/${LAT}/${LON}/${DEC}/${AZ}/${KWP}`
-      : `https://api.forecast.solar/estimate/${LAT}/${LON}/${DEC}/${AZ}/${KWP}`;
+    
+    // Wir sammeln die aggregierten Watt-Werte hier
+    const aggregatedWatts: Record<string, number> = {};
 
-    const response = await axios.get(url);
-    const watts = response.data.result.watts;
+    const solarConfig = getConfig().solarPlant;
+    const LAT = solarConfig.location.lat;
+    const LON = solarConfig.location.lon;
+    const ROOFS = solarConfig.arrays;
+
+    for (const roof of ROOFS) {
+      // Wir nutzen die Open-Meteo Forecast API mit 'global_tilted_irradiance',
+      // da dies die Einstrahlung auf die geneigte und ausgerichtete Fläche berechnet.
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=global_tilted_irradiance&tilt=${roof.dec}&azimuth=${roof.az}&forecast_days=7`;
+      
+      console.log(`[solarService]: Fetching Open-Meteo forecast for ${roof.name} roof (${roof.kwp} kWp)`);
+      const response = await axios.get(url);
+      
+      const times = response.data.hourly.time;
+      const radiations = response.data.hourly.global_tilted_irradiance;
+
+      // Aggregieren der Werte
+      for (let i = 0; i < times.length; i++) {
+        const timeStr = times[i];
+        const radiation = radiations[i]; // W/m²
+
+        if (radiation === null) continue;
+
+        // Umrechnung von Strahlung (W/m²) in elektrische Leistung (Watt)
+        // Standard-Testbedingung (STC) für PV-Module ist 1000 W/m² für 1 kWp.
+        // Formel: Watt = (Strahlung / 1000) * (kWp * 1000) * Wirkungsgrad (0.85)
+        // Vereinfacht: Watt = Strahlung * kWp * 0.85
+        const wattValue = radiation * roof.kwp * 0.85;
+
+        const dateObj = new Date(timeStr + "Z"); // Open-Meteo liefert lokale Zeit oder UTC? Standard ist UTC (iso8601). Wait, es liefert "2026-04-30T00:00" ohne Z. Da OpenMeteo default UTC nimmt, hängen wir ein Z dran.
+        dateObj.setMinutes(0, 0, 0); // Normalize to full hour
+        const hourKey = dateObj.toISOString();
+
+        if (!aggregatedWatts[hourKey]) {
+          aggregatedWatts[hourKey] = 0;
+        }
+        aggregatedWatts[hourKey] += wattValue;
+      }
+    }
 
     const client = await pool.connect();
     try {
-      for (const [timeStr, wattValue] of Object.entries(watts)) {
+      for (const [timeStr, wattValue] of Object.entries(aggregatedWatts)) {
         const timestamp = new Date(timeStr);
-        const wattHours = Number(wattValue);
+        const wattHours = wattValue;
 
         await client.query(`
           INSERT INTO pv_forecast (timestamp, watt_hours)
@@ -30,7 +62,7 @@ export const fetchAndStoreSolarForecast = async () => {
           ON CONFLICT (timestamp) DO UPDATE SET watt_hours = EXCLUDED.watt_hours
         `, [timestamp, wattHours]);
       }
-      console.log(`[solarService]: Successfully updated ${Object.keys(watts).length} solar data points`);
+      console.log(`[solarService]: Successfully updated ${Object.keys(aggregatedWatts).length} aggregated solar data points`);
     } finally {
       client.release();
     }

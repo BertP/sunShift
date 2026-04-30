@@ -215,8 +215,13 @@ function App() {
       setSolar(response.data.solar);
       setDevices(response.data.devices);
       
-      setPowerSequences({});
-      setPowerTimeSlots({});
+      if (response.data.powerSequences) {
+        setPowerSequences(response.data.powerSequences);
+      }
+      if (response.data.powerTimeSlots) {
+        setPowerTimeSlots(response.data.powerTimeSlots);
+      }
+
 
       try {
         const histRes = await axios.get(`/api/telemetry-history?date=${selectedDate}`);
@@ -1403,7 +1408,7 @@ function App() {
       </main>
 
       <footer className="glass-footer">
-        <p>&copy; 2026 SunShift EMS | Smart Energy. Perfect Timing. | v{packageJson.version}</p>
+        <p>&copy; 2026 SunShift EMS | Smart Energy. Perfect Timing. | {import.meta.env.VITE_APP_VERSION || `v${packageJson.version}`}</p>
 
       </footer>
       <FloatingPanels 
