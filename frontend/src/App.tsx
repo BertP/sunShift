@@ -1136,38 +1136,40 @@ function App() {
             {!isMonitoringExpanded && (
               <div style={{ 
                 display: 'flex', 
-                gap: '1.5rem', 
+                gap: '1.25rem', 
                 alignItems: 'center',
                 margin: '0 auto 0 2rem',
                 animation: 'fadeIn 0.4s ease-out'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Sun size={16} style={{ color: '#fbbf24' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fbbf24' }}>{Math.round(telemetry.pvLeistung)}W</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#fbbf24' }}>{Math.round(telemetry.pvLeistung)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Home size={16} style={{ color: '#38bdf8' }} />
-                  <span style={{ fontWeight: 600, fontSize: '0.85rem', color: '#94a3b8' }}>Haus</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#38bdf8' }}>{Math.round(telemetry.pvLeistung + telemetry.netzzustand)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Zap size={16} style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{Math.round(telemetry.netzzustand)}W</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{Math.round(telemetry.netzzustand)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Battery size={16} style={{ color: '#4ade80' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#4ade80' }}>{Math.round(telemetry.batteryLevel)}%</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#4ade80' }}>{Math.round(telemetry.batteryLevel)}%</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Car size={16} style={{ color: '#38bdf8' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#38bdf8' }}>{Math.round(telemetry.eUpPower)}W</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#38bdf8' }}>{Math.round(telemetry.eUpPower)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Fan size={16} style={{ color: '#f472b6' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f472b6' }}>{Math.round(telemetry.heatPumpPower)}W</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#f472b6' }}>{Math.round(telemetry.heatPumpPower)}W</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <BatteryCharging size={16} style={{ color: '#fbbf24' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.75rem', color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}{!isNaN(parseFloat(telemetry.batteryState)) ? '%' : ''}</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#fbbf24', textTransform: 'uppercase' }}>
+                    {telemetry.batteryState}{!isNaN(parseFloat(telemetry.batteryState)) ? '%' : ''}
+                  </span>
                 </div>
               </div>
             )}
@@ -1200,7 +1202,7 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
                   <Home style={{ color: '#38bdf8', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>HAUSVERBRAUCH</span>
-                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8' }}>Haus</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8' }}>{Math.round(telemetry.pvLeistung + telemetry.netzzustand)} W</span>
                 </div>
 
                 <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
@@ -1246,7 +1248,9 @@ function App() {
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
                   <BatteryCharging style={{ color: '#fbbf24', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>CHARGING STATE</span>
-                  <span style={{ fontSize: '1.25rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}{!isNaN(parseFloat(telemetry.batteryState)) ? '%' : ''}</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24', textTransform: 'uppercase' }}>
+                    {telemetry.batteryState}{!isNaN(parseFloat(telemetry.batteryState)) ? '%' : ''}
+                  </span>
                 </div>
               </div>
             </div>
