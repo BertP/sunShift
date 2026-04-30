@@ -1112,31 +1112,6 @@ function App() {
       )}
 
       <main className="dashboard-grid">
-        {/* SunShift EMS Header Tile */}
-        <section className="glass-card ems-header-card" style={{ 
-          gridColumn: '1 / -1', 
-          padding: '1.5rem 2rem', 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '0' 
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Sun style={{ color: '#fbbf24', width: 32, height: 32 }} />
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, border: 'none', padding: 0 }}>SunShift <span style={{ color: '#38bdf8' }}>EMS</span></h2>
-          </div>
-          <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.1em' }}>SYSTEM STATUS</span>
-              <span style={{ color: '#4ade80', fontWeight: 700, fontSize: '0.85rem' }}>● OPERATIONAL</span>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <span style={{ display: 'block', fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.1em' }}>LAST UPDATE</span>
-              <span style={{ color: '#f1f5f9', fontWeight: 600, fontSize: '0.85rem' }}>{new Date().toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'})}</span>
-            </div>
-          </div>
-        </section>
-
         {/* Energy Dashboard (formerly Monitoring) */}
         <section className="glass-card monitoring-card" style={{ 
           gridColumn: '1 / -1', 
