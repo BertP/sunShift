@@ -80,7 +80,8 @@ const handleTelemetryEvent = (event: any) => {
         entityId === entities.gridPower || 
         entityId === entities.evChargingPower ||
         entityId === entities.batteryLevel ||
-        entityId === entities.batteryChargingState) {
+        entityId === entities.batteryChargingState ||
+        entityId === entities.heatPumpPower) {
         
       const value = newState?.state;
       const numValue = parseFloat(value);
@@ -92,6 +93,7 @@ const handleTelemetryEvent = (event: any) => {
       if (entityId === entities.evChargingPower && !isNaN(numValue)) updateTelemetry(null, null, numValue);
       if (entityId === entities.batteryLevel && !isNaN(numValue)) updateTelemetry(null, null, null, numValue);
       if (entityId === entities.batteryChargingState) updateTelemetry(null, null, null, undefined, value);
+      if (entityId === entities.heatPumpPower && !isNaN(numValue)) updateTelemetry(null, null, null, undefined, undefined, numValue);
     }
 
 

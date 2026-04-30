@@ -14,7 +14,8 @@ import {
   Battery,
   BatteryCharging,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Thermometer
 } from 'lucide-react';
 
 import { Chart as ChartJS, registerables } from 'chart.js';
@@ -85,7 +86,8 @@ function App() {
     netzzustand: 0, 
     eUpPower: 0,
     batteryLevel: 0,
-    batteryState: 'idle'
+    batteryState: 'idle',
+    heatPumpPower: 0
   });
 
 
@@ -1128,35 +1130,39 @@ function App() {
               userSelect: 'none'
             }}
           >
-            <h2 style={{ margin: 0, border: 'none', padding: 0, fontSize: '1.25rem' }}>Energy Dashboard</h2>
+            <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Energy Dashboard</h2>
             
             {!isMonitoringExpanded && (
               <div style={{ 
                 display: 'flex', 
-                gap: '2.5rem', 
+                gap: '1.5rem', 
                 alignItems: 'center',
-                margin: '0 auto 0 3rem',
+                margin: '0 auto 0 2rem',
                 animation: 'fadeIn 0.4s ease-out'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Sun size={18} style={{ color: '#fbbf24' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#fbbf24' }}>{telemetry.pvLeistung}W</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Sun size={16} style={{ color: '#fbbf24' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fbbf24' }}>{telemetry.pvLeistung}W</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Home size={18} style={{ color: '#38bdf8' }} />
-                  <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#94a3b8' }}>Haus</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Home size={16} style={{ color: '#38bdf8' }} />
+                  <span style={{ fontWeight: 600, fontSize: '0.85rem', color: '#94a3b8' }}>Haus</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Zap size={18} style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand}W</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Zap size={16} style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand}W</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Battery size={18} style={{ color: '#4ade80' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Battery size={16} style={{ color: '#4ade80' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#4ade80' }}>{telemetry.batteryLevel}%</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <BatteryCharging size={18} style={{ color: '#fbbf24' }} />
-                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Thermometer size={16} style={{ color: '#f472b6' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f472b6' }}>{telemetry.heatPumpPower}W</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <BatteryCharging size={16} style={{ color: '#fbbf24' }} />
+                  <span style={{ fontWeight: 700, fontSize: '0.75rem', color: '#fbbf24', textTransform: 'uppercase' }}>{telemetry.batteryState}</span>
                 </div>
               </div>
             )}
@@ -1174,9 +1180,11 @@ function App() {
                 padding: '1.5rem',
                 background: 'rgba(255,255,255,0.03)',
                 borderRadius: '1rem',
-                border: '1px solid rgba(255,255,255,0.05)'
+                border: '1px solid rgba(255,255,255,0.05)',
+                flexWrap: 'wrap',
+                gap: '1rem'
               }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
                   <Sun style={{ color: '#fbbf24', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>PV ERTRAG</span>
                   <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#fbbf24' }}>{telemetry.pvLeistung} W</span>
@@ -1184,7 +1192,7 @@ function App() {
                 
                 <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
 
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
                   <Home style={{ color: '#38bdf8', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>HAUSVERBRAUCH</span>
                   <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#38bdf8' }}>Haus</span>
@@ -1192,10 +1200,18 @@ function App() {
 
                 <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
 
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
                   <Zap style={{ color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171', width: 32, height: 32 }} />
                   <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>NETZSTATUS</span>
                   <span style={{ fontSize: '1.5rem', fontWeight: 800, color: telemetry.netzzustand < 0 ? '#4ade80' : '#f87171' }}>{telemetry.netzzustand} W</span>
+                </div>
+
+                <div style={{ width: '1px', height: '50px', background: 'rgba(255,255,255,0.1)' }} />
+
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', minWidth: '100px' }}>
+                  <Thermometer style={{ color: '#f472b6', width: 32, height: 32 }} />
+                  <span style={{ fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.05em' }}>WÄRMEPUMPE</span>
+                  <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#f472b6' }}>{telemetry.heatPumpPower} W</span>
                 </div>
               </div>
 

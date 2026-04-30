@@ -67,8 +67,11 @@ export const initDB = async () => {
         timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         pv_power_w FLOAT NOT NULL,
         grid_power_w FLOAT NOT NULL,
-        ev_power_w FLOAT DEFAULT 0
+        ev_power_w FLOAT DEFAULT 0,
+        hp_power_w FLOAT DEFAULT 0
       );
+      ALTER TABLE live_telemetry_history ADD COLUMN IF NOT EXISTS ev_power_w FLOAT DEFAULT 0;
+      ALTER TABLE live_telemetry_history ADD COLUMN IF NOT EXISTS hp_power_w FLOAT DEFAULT 0;
     `);
 
 

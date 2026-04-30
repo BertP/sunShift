@@ -9,7 +9,8 @@
       "gridPower": "sensor.netzzustand",
       "evChargingPower": "sensor.smaev_3011444125_charging_station_power",
       "batteryLevel": "sensor.sb_battery_level",
-      "batteryChargingState": "sensor.ladezustand_pv_batterie"
+      "batteryChargingState": "sensor.ladezustand_pv_batterie",
+      "heatPumpPower": "sensor.daikinwp_total_active_power"
     }
   },
   "solarPlant": {
