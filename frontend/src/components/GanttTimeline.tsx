@@ -71,7 +71,7 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                       Ende: {new Date(endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </div>
 
-                    <div style={{ display: 'flex', height: '100%', width: '100%' }}>
+                    <div style={{ display: 'flex', height: '100%', width: '100%', alignItems: 'flex-end' }}>
                       {deviceSlots.map((slot: any, sIdx: number) => {
                         const slotPct = (slot.durationMinutes / totalMins) * 100;
                         const powerPct = (slot.powerConsumptionW / maxW) * 100;
@@ -82,12 +82,18 @@ export const GanttTimeline: React.FC<GanttTimelineProps> = ({
                             style={{ 
                               width: `${slotPct}%`, 
                               height: `${powerPct}%`, 
-                              alignSelf: 'flex-end', 
-                              background: '#fbbf24', 
-                              borderRadius: '2px 2px 0 0' 
+                              background: 'rgba(255, 255, 255, 0.4)', 
+                              borderLeft: '1px solid rgba(255, 255, 255, 0.2)',
+                              position: 'relative'
                             }} 
-                            title={`${slot.powerConsumptionW}W`}
-                          />
+                            title={`${slot.powerConsumptionW}W (${slot.durationMinutes} min)`}
+                          >
+                            <div className="gantt-tooltip">
+                              <strong>Slot {sIdx + 1}</strong><br/>
+                              Verbrauch: {slot.powerConsumptionW}W<br/>
+                              Dauer: {slot.durationMinutes} min
+                            </div>
+                          </div>
                         );
                       })}
                     </div>

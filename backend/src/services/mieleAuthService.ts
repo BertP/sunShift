@@ -91,7 +91,7 @@ export const exchangeCodeForToken = async (code: string) => {
   }
 };
 
-export const refreshMieleToken = async () => {
+export const refreshMieleToken = async (retryCount = 0) => {
   if (!currentTokens?.refresh_token) return;
 
   const tokenUrl = 'https://auth.domestic.miele-iot.com/partner/realms/mcs/protocol/openid-connect/token';
@@ -117,7 +117,15 @@ export const refreshMieleToken = async () => {
     await setTokens(response.data);
     console.log('[mieleAuth]: Token refreshed successfully.');
   } catch (error: any) {
-    console.error('[mieleAuth]: Token refresh failed:', error.response?.data || error.message);
+    console.error(`[mieleAuth]: Token refresh failed (attempt ${retryCount + 1}):`, error.response?.data || error.message);
+    
+    if (retryCount < 5) {
+      const delay = Math.pow(2, retryCount) * 5000; // 5s, 10s, 20s, 40s, 80s
+      console.log(`[mieleAuth]: Retrying refresh in ${delay / 1000}s...`);
+      setTimeout(() => refreshMieleToken(retryCount + 1), delay);
+    } else {
+      console.error('[mieleAuth]: Max retries reached for token refresh.');
+    }
   }
 };
 

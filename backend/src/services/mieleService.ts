@@ -51,9 +51,9 @@ export const scheduleDevice = async (deviceId: string, startTime: Date) => {
 
   // Store in DB
   await pool.query(`
-    INSERT INTO device_schedules (device_id, device_name, scheduled_start, scheduled_end, status)
-    VALUES ($1, $2, $3, $4, $5)
-  `, [deviceId, device.name, startTime, endTime, 'SCHEDULED']);
+    INSERT INTO device_schedules (device_id, device_name, scheduled_start, scheduled_end, earliest_start, latest_end, status)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+  `, [deviceId, device.name, startTime, endTime, startTime, endTime, 'SCHEDULED']);
 
   console.log(`[mieleService]: Scheduled ${device.name} from ${startTime.toISOString()} to ${endTime.toISOString()}`);
   return { device, startTime, endTime };

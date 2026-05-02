@@ -4,6 +4,7 @@ interface FloatingPanelsProps {
   isLogsDetached: boolean;
   setIsLogsDetached: (val: boolean) => void;
   apiLogs: any[];
+  callbackLogs: any[];
   tickerPos: { x: number; y: number };
   setTickerDragging: (val: boolean) => void;
   setTickerRel: (rel: { x: number; y: number }) => void;
@@ -19,6 +20,7 @@ export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
   isLogsDetached,
   setIsLogsDetached,
   apiLogs,
+  callbackLogs,
   tickerPos,
   setTickerDragging,
   setTickerRel,
@@ -161,19 +163,19 @@ export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '0.5rem 0', fontFamily: 'monospace', fontSize: '0.8rem' }}>
-          {apiLogs.filter(log => log.endpoint === '/api/spine/callback').map(log => {
-            let payloadStr = log.response;
+          {callbackLogs.map(log => {
+            let payloadStr = log.payload;
             try {
-              if (typeof log.response !== 'string') {
-                payloadStr = JSON.stringify(log.response, null, 2);
+              if (typeof log.payload !== 'string') {
+                payloadStr = JSON.stringify(log.payload, null, 2);
               }
             } catch (_) {}
 
             return (
               <div key={log.id} style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.25rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', color: '#22c55e', fontWeight: 'bold', fontSize: '0.75rem' }}>
-                  <span>📥 Webhook Received</span>
-                  <span style={{ color: '#64748b' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                  <span>📥 {log.feature_type}</span>
+                  <span style={{ color: '#64748b' }}>{new Date(log.timestamp).toLocaleString()}</span>
                 </div>
                 <pre style={{ whiteSpace: 'pre-wrap', color: '#94a3b8', margin: '0.25rem 0 0 0', fontSize: '0.75rem' }}>
                   {payloadStr}
@@ -181,8 +183,8 @@ export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
               </div>
             );
           })}
-          {apiLogs.filter(log => log.endpoint === '/api/spine/callback').length === 0 && (
-            <p style={{ color: '#64748b', textAlign: 'center', marginTop: '2rem' }}>Warte auf SPINE Callbacks...</p>
+          {callbackLogs.length === 0 && (
+            <p style={{ color: '#64748b', textAlign: 'center', marginTop: '2rem' }}>Keine persistenten Callbacks gefunden.</p>
           )}
         </div>
       </div>

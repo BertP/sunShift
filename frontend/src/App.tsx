@@ -90,6 +90,7 @@ function App() {
     batteryState: 'idle',
     heatPumpPower: 0
   });
+  const [callbackLogs, setCallbackLogs] = useState<any[]>([]);
 
 
 
@@ -104,7 +105,13 @@ function App() {
 
   const [visibleDatasets, setVisibleDatasets] = useState<string[]>(['price', 'pv', 'washer', 'dryer', 'dishwasher', 'eup']);
   const [viewType, setViewType] = useState<'forecast' | 'live'>('forecast');
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const getLocalISODate = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  };
+
+  const [selectedDate, setSelectedDate] = useState<string>(getLocalISODate());
   const [liveHistory, setLiveHistory] = useState<any[]>([]);
 
 
@@ -254,6 +261,13 @@ function App() {
         setApiLogs(logsRes.data);
       } catch (logErr) {
         console.error('Failed to fetch API logs', logErr);
+      }
+
+      try {
+        const cbLogsRes = await axios.get('/api/spine/callback-logs');
+        setCallbackLogs(cbLogsRes.data);
+      } catch (cbErr) {
+        console.error('Failed to fetch callback logs', cbErr);
       }
       
       setError(null);
@@ -508,13 +522,21 @@ function App() {
   const livePvData = new Array(expandedLabels.length).fill(null);
   const liveGridData = new Array(expandedLabels.length).fill(null);
 
-  // Map each live point to its corresponding 15‑minute slot
+  // Map each live point to its corresponding 15‑minute slot, aligned with expandedLabels
+  const firstPriceHour = prices.length ? new Date(prices[0].timestamp).getHours() : 0;
+  
   liveHistory.forEach((pt: any) => {
     const d = new Date(pt.timestamp);
     const hour = d.getHours();
     const minute = d.getMinutes();
-    const slotIdx = hour * 4 + Math.floor(minute / 15);
-    if (slotIdx < livePvData.length) {
+    
+    // Calculate index relative to the start of the chart (prices[0])
+    let slotIdx = (hour - firstPriceHour) * 4 + Math.floor(minute / 15);
+    
+    // Handle wrap-around if needed (though usually we are within a 24-48h window)
+    if (slotIdx < 0) slotIdx += 96; 
+
+    if (slotIdx >= 0 && slotIdx < livePvData.length) {
       livePvData[slotIdx] = pt.pv_power_w;
       liveGridData[slotIdx] = pt.grid_power_w;
     }
@@ -662,7 +684,7 @@ function App() {
       const firstPriceTime = new Date(prices[0].timestamp);
       const elapsedMs = now.getTime() - firstPriceTime.getTime();
       const index = elapsedMs / (1000 * 60 * 15);
-      const xPos = xAxis.left + (xAxis.width * (index / 96));
+      const xPos = xAxis.left + (xAxis.width * (index / (expandedLabels.length || 96)));
       
       if (xPos < xAxis.left || xPos > xAxis.right) return;
 
@@ -1348,7 +1370,7 @@ function App() {
             {viewType === 'forecast' ? (
               <Bar ref={chartRef} data={chartData as any} options={chartOptions} plugins={[ganttLayoutSync, currentTimeLine]} />
             ) : (
-              <Line data={liveChartData as any} options={liveChartOptions as any} />
+              <Line data={liveChartData as any} options={liveChartOptions as any} plugins={[currentTimeLine]} />
             )}
           </div>
 
@@ -1560,6 +1582,7 @@ function App() {
         isLogsDetached={isLogsDetached}
         setIsLogsDetached={setIsLogsDetached}
         apiLogs={apiLogs}
+        callbackLogs={callbackLogs}
         tickerPos={tickerPos}
         setTickerDragging={setTickerDragging}
         setTickerRel={setTickerRel}

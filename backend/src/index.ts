@@ -41,7 +41,18 @@ app.get('/api/dashboard', async (req: Request, res: Response) => {
     addApiLog('STORY', 'System Ticker', '• Initialisiere Dashboard Aktualisierung\n• Lese Strompreise & PV-Ertragsprognose (lokal)\n• Synchronisiere Miele Cloud Geräte');
     const prices = await getPrices(dateStr);
     const solar = await getSolarForecast(dateStr);
-    const devices = await getMieleDevices();
+    const discoveredDevices = await getSpineDevices();
+    
+    // Map Spine devices to dashboard format
+    const devices = discoveredDevices.map(d => ({
+      id: d.id,
+      name: d.name,
+      type: d.type,
+      status: d.status,
+      programDurationMinutes: 0, // Will be enriched from sequence
+      readyAt: new Date()
+    }));
+
     const schedulesResult = await pool.query('SELECT * FROM device_schedules ORDER BY scheduled_start DESC LIMIT 10');
 
     const baseDate = dateStr ? new Date(dateStr) : new Date();
@@ -80,7 +91,7 @@ app.get('/api/dashboard', async (req: Request, res: Response) => {
 
     for (const dev of devices) {
       try {
-        const seq = await getPowerSequence(dev.id);
+        const seq = await getPowerSequence(dev.id, dev.status);
         if (seq) powerSequences[dev.id] = seq;
       } catch (_) {}
 
@@ -126,7 +137,7 @@ app.get('/api/telemetry-history', async (req: Request, res: Response) => {
 });
 
 
-import { getSpineDevices, configureSpineApi, getPowerSequence, getPowerTimeSlot } from './services/spineService';
+import { getSpineDevices, configureSpineApi, getPowerSequence, getPowerTimeSlot, syncAllDevices } from './services/spineService';
 
 
 app.get('/api/features/powerSequence', async (req: Request, res: Response) => {
@@ -384,7 +395,7 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
       const slotsData = await getPowerTimeSlot(id);
       await pool.query(
         "INSERT INTO executed_runs (device_id, device_name, start_time, profile_slots) VALUES ($1, $2, $3, $4)",
-        [id, 'Miele Device', startTime, JSON.stringify(slotsData.slots)]
+        [id, 'Miele Device', startTime, JSON.stringify(slotsData?.slots || [])]
       );
       console.log(`[server]: Pinned executed run profile for manual start of ${id}`);
     } catch (runErr) {
@@ -414,14 +425,26 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
 
     if (Array.isArray(payload)) {
       for (const item of payload) {
+        // Persist callback to DB for audit
+        try {
+          const devId = item.deviceId || (item.feature && item.feature.deviceId);
+          const featType = item.featureObjType || (item.feature && item.feature.featureObjType) || 'unknown';
+          await pool.query(
+            'INSERT INTO callback_logs (device_id, feature_type, payload) VALUES ($1, $2, $3)',
+            [devId, featType, JSON.stringify(item)]
+          );
+        } catch (dbLogErr) {
+          console.error('[spineCallback]: Failed to persist callback log:', dbLogErr);
+        }
+
         if (item.change === 'createReplace' && item.feature && item.feature.featureObjType === 'powerSequence') {
           const seq = item.feature;
           const deviceId = seq.deviceId;
           if (deviceId && seq.data) {
              const newState = seq.data.state ? seq.data.state.toUpperCase() : 'SCHEDULED';
              await pool.query(
-               'UPDATE device_schedules SET status = $1, scheduled_start = $2, scheduled_end = $3 WHERE device_id = $4',
-               [newState, seq.data.startTime, seq.data.endTime, deviceId]
+               'UPDATE device_schedules SET status = $1, scheduled_start = $2, scheduled_end = $3, earliest_start = $4, latest_end = $5 WHERE device_id = $6',
+               [newState, seq.data.startTime, seq.data.endTime, seq.data.earliestStartTime, seq.data.latestEndTime, deviceId]
              );
              console.log(`[spineCallback]: Updated ${deviceId} to ${newState}`);
 
@@ -434,7 +457,7 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
                  if (newState === 'RUNNING') {
                    await pool.query(
                      "INSERT INTO executed_runs (device_id, device_name, start_time, profile_slots) VALUES ($1, $2, $3, $4)",
-                     [deviceId, 'Miele Device', seq.data.startTime || new Date().toISOString(), JSON.stringify(slotsData.slots)]
+                     [deviceId, 'Miele Device', seq.data.startTime || new Date().toISOString(), JSON.stringify(slotsData?.slots || [])]
                    );
                    console.log(`[spineCallback]: Pinned executed run profile for ${deviceId}`);
                  }
@@ -485,7 +508,7 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
                   const slotsData = await getPowerTimeSlot(deviceId);
                   await pool.query(
                     "INSERT INTO executed_runs (device_id, device_name, start_time, profile_slots) VALUES ($1, $2, $3, $4)",
-                    [deviceId, 'Miele Device', schedRes.rows[0].scheduled_start || new Date().toISOString(), JSON.stringify(slotsData.slots)]
+                    [deviceId, 'Miele Device', schedRes.rows[0].scheduled_start || new Date().toISOString(), JSON.stringify(slotsData?.slots || [])]
                   );
                   console.log(`[spineCallback]: Pinned updated run profile for ${deviceId} via dynamic slot update`);
                 } catch (ptsErr2) {}
@@ -504,6 +527,15 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
   }
 });
 
+app.get('/api/spine/callback-logs', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT * FROM callback_logs ORDER BY timestamp DESC LIMIT 100');
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/optimize', async (req: Request, res: Response) => {
 
   try {
@@ -517,12 +549,12 @@ app.post('/api/optimize', async (req: Request, res: Response) => {
   }
 });
 
-// Periodic Price Sync (every 24 hours)
+// Periodic Price Sync (every 3 hours)
 setInterval(async () => {
-  console.log('[cron]: Running 24-hourly price sync...');
+  console.log('[cron]: Running 3-hourly price sync...');
   await fetchAndStorePrices();
   await runOptimization();
-}, 24 * 60 * 60 * 1000);
+}, 3 * 60 * 60 * 1000);
 
 // Periodic PV Forecast Sync (every 15 minutes)
 setInterval(async () => {
@@ -538,11 +570,12 @@ setTimeout(async () => {
   await loadTokensFromDB();
   await fetchAndStorePrices();
   await fetchAndStoreSolarForecast();
+  await syncAllDevices();
   await runOptimization();
   connectToHomeAssistant();
 
 }, 5000);
 
-app.listen(PORT, () => {
-  console.log(`[server]: Server is running at http://localhost:${PORT}`);
+app.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`[server]: Server is running at http://0.0.0.0:${PORT}`);
 });

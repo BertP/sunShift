@@ -21,9 +21,15 @@ import axios from 'axios';
 const boundDevices = new Set<string>();
 const subscribedDevices = new Set<string>();
 
+let cachedDevices: SpineDevice[] = [];
+let cacheTimestamp = 0;
+const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
 export const clearBoundDevices = () => {
   boundDevices.clear();
   subscribedDevices.clear();
+  cachedDevices = [];
+  cacheTimestamp = 0;
 };
 
 
@@ -36,6 +42,13 @@ export const getSpineDevices = async () => {
     console.error('[spineService]: Failed to load bound devices from DB:', dbErr);
   }
 
+  // Cache Check
+  const now = Date.now();
+  if (cachedDevices.length > 0 && (now - cacheTimestamp) < CACHE_TTL) {
+    console.log('[spineService]: Returning cached device list.');
+    return cachedDevices;
+  }
+
   const token = getAccessToken();
   if (!token) {
     console.log('[spineService]: No live token, returning empty list.');
@@ -43,7 +56,7 @@ export const getSpineDevices = async () => {
   }
 
   try {
-    console.log('[spineService]: Fetching live devices from Miele...');
+    console.log('[spineService]: Fetching live devices from Miele Cloud...');
     const response = await axios.get('https://ems.domestic.miele-iot.com/v1/devices', {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -52,8 +65,6 @@ export const getSpineDevices = async () => {
     });
 
     addApiLog('GET', '/devices', response.data);
-
-    console.log('[spineService]: Live API response:', JSON.stringify(response.data));
 
     // Map Miele payload to SpineDevice
     // Miele often returns an array, or an object where keys are serial numbers.
@@ -224,11 +235,9 @@ export const getSpineDevices = async () => {
       console.error('[spineService]: Failed to resolve binding mappings:', bindErr.message);
     }
 
-    // If no devices were found in the real API, return mock devices so the UI doesn't look empty in the POC
-    if (liveDevices.length === 0) {
-      console.log('[spineService]: Live API returned no devices.');
-      return [];
-    }
+    // Cache the result
+    cachedDevices = liveDevices;
+    cacheTimestamp = now;
 
     return liveDevices;
   } catch (error: any) {
@@ -238,9 +247,34 @@ export const getSpineDevices = async () => {
   }
 };
 
-export const getPowerSequence = async (deviceId: string) => {
+export const getPowerSequence = async (deviceId: string, currentStatus?: string) => {
+  const status = currentStatus?.toLowerCase() || 'unknown';
+
+  // DB-First: Check if we have a RECENT schedule/sequence in DB (max 15 mins old)
+  try {
+    const res = await pool.query(
+      "SELECT status, scheduled_start, scheduled_end, earliest_start, latest_end FROM device_schedules WHERE device_id = $1 AND created_at > NOW() - INTERVAL '15 minutes' ORDER BY id DESC LIMIT 1",
+      [deviceId]
+    );
+    if (res.rows.length > 0) {
+      const row = res.rows[0];
+      console.log(`[spineService]: Using recent DB-cached sequence for ${deviceId}`);
+      return {
+        state: row.status.toLowerCase(),
+        startTime: row.scheduled_start,
+        endTime: row.scheduled_end,
+        earliestStartTime: row.earliest_start,
+        latestEndTime: row.latest_end
+      };
+    }
+  } catch (dbErr) {
+    console.error('[spineService]: DB lookup failed for power sequence:', dbErr);
+  }
+
+  // Strategy: If DB is empty/stale, we MUST check the cloud to establish the "Ground Truth".
+  // We no longer skip based on status to avoid missing plans on 'READY' machines.
   const token = getAccessToken();
-  console.log(`[spineService]: Requesting power sequence for ${deviceId}...`);
+  console.log(`[spineService]: Requesting ground truth from Miele Cloud for ${deviceId}...`);
 
   try {
     const response = await axios.get(`https://ems.domestic.miele-iot.com/v1/features/powerSequence?deviceId=${deviceId}`, {
@@ -258,13 +292,33 @@ export const getPowerSequence = async (deviceId: string) => {
     return response.data;
   } catch (error: any) {
     console.error(`[spineService]: Failed to fetch power sequence for ${deviceId}:`, error.response?.data || error.message);
-    
     throw new Error(`Failed to fetch power sequence for ${deviceId}: ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`);
   }
 };
+
 export const getPowerTimeSlot = async (deviceId: string) => {
+  // DB-First: Check dynamic_power_slots
+  try {
+    const dbSlots = await pool.query(
+      'SELECT slot_number, duration_minutes, power_w FROM dynamic_power_slots WHERE device_id = $1 ORDER BY slot_number ASC',
+      [deviceId]
+    );
+    
+    if (dbSlots.rows.length > 0) {
+      console.log(`[spineService]: Using DB-cached time slots for ${deviceId}`);
+      const timeSlots = dbSlots.rows.map((r: any, idx: number) => ({
+        chunkIndex: idx,
+        durationMinutes: r.duration_minutes,
+        powerConsumptionW: r.power_w
+      }));
+      return { deviceId, slots: timeSlots };
+    }
+  } catch (dbErr) {
+    console.error('[spineService]: DB lookup failed for power time slots:', dbErr);
+  }
+
   const token = getAccessToken();
-  console.log(`[spineService]: Requesting power time slot for ${deviceId}...`);
+  console.log(`[spineService]: Requesting power time slot from Miele Cloud for ${deviceId}...`);
 
   try {
     const response = await axios.get(`https://ems.domestic.miele-iot.com/v1/features/powerTimeSlot?deviceId=${deviceId}`, {
@@ -276,25 +330,8 @@ export const getPowerTimeSlot = async (deviceId: string) => {
 
     return response.data;
   } catch (error: any) {
-    const { Pool } = require('pg');
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL || 'postgresql://postgres:sunshift@localhost:5432/sunshift'
-    });
-    const dbSlots = await pool.query(
-      'SELECT slot_number, duration_minutes, power_w FROM dynamic_power_slots WHERE device_id = $1 ORDER BY slot_number ASC',
-      [deviceId]
-    );
-    
-    if (dbSlots.rows.length > 0) {
-      const timeSlots = dbSlots.rows.map((r: any, idx: number) => ({
-        chunkIndex: idx,
-        durationMinutes: r.duration_minutes,
-        powerConsumptionW: r.power_w
-      }));
-      return { deviceId, slots: timeSlots };
-    }
+    console.error(`[spineService]: Failed to fetch power time slot for ${deviceId}:`, error.response?.data || error.message);
     throw new Error(`Kein dynamischer Lastgang verfügbar für dieses Gerät (${deviceId})`);
-
   }
 };
 
@@ -303,4 +340,60 @@ export const configureSpineApi = async (config: { endpoint: string; token: strin
   console.log('[spineService]: Configuring Spine-IoT API connection:', config.endpoint);
   // In real life, verify connection here
   return { success: true, message: 'Spine-IoT API connected successfully' };
+};
+
+export const syncAllDevices = async () => {
+  console.log('[spineService]: Starting full initial sync with Miele Cloud...');
+  const devices = await getSpineDevices();
+  
+  for (const device of devices) {
+    try {
+      console.log(`[spineService]: Syncing ${device.name} (${device.id})...`);
+      
+      const token = getAccessToken();
+      if (!token) {
+        console.log('[spineService]: No token available for sync. Skipping.');
+        break;
+      }
+
+      // 1. Sync Power Sequence
+      const seqRes = await axios.get(`https://ems.domestic.miele-iot.com/v1/features/powerSequence?deviceId=${device.id}`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+      }).catch(() => null);
+
+      if (seqRes && seqRes.data) {
+        // Handle both single object and array responses
+        let seq = seqRes.data;
+        if (Array.isArray(seq)) {
+          const item = seq.find((i: any) => i.deviceId === device.id);
+          seq = item ? item.data : null;
+        }
+
+        if (seq) {
+          let newState = seq.state?.toUpperCase() || 'READY';
+          const startTime = seq.startTime || null;
+          const endTime = seq.endTime || null;
+          const earliest = seq.earliestStartTime || null;
+          const latest = seq.latestEndTime || null;
+
+          await pool.query(
+            'INSERT INTO device_schedules (device_id, device_name, scheduled_start, scheduled_end, earliest_start, latest_end, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [device.id, device.name, startTime, endTime, earliest, latest, newState]
+          );
+          console.log(`[spineService]: Synced sequence for ${device.name}: ${newState}`);
+
+          // NEW: Also sync Power Time Slots for accurate chart/tooltip rendering
+          try {
+            await getPowerTimeSlot(device.id);
+            console.log(`[spineService]: Synced power slots for ${device.name}`);
+          } catch (slotErr) {
+            console.error(`[spineService]: Failed to sync power slots for ${device.name}`);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error(`[spineService]: Error syncing device ${device.id}: `, err.message);
+    }
+  }
+  console.log('[spineService]: Initial sync completed.');
 };

@@ -10,6 +10,8 @@ const HA_TOKEN = process.env.HA_LL_TOKEN || '';
 
 let ws: WebSocket | null = null;
 let messageId = 1;
+let pingInterval: NodeJS.Timeout | null = null;
+let pongTimeout: NodeJS.Timeout | null = null;
 
 export const connectToHomeAssistant = () => {
   if (!HA_TOKEN) {
@@ -17,16 +19,27 @@ export const connectToHomeAssistant = () => {
     return;
   }
 
+  if (ws) {
+    ws.terminate();
+  }
+
   console.log('[homeAssistantService]: Connecting to Home Assistant...');
   ws = new WebSocket(HA_URL);
 
   ws.on('open', () => {
     console.log('[homeAssistantService]: WebSocket connection established.');
+    startHeartbeat();
   });
 
   ws.on('message', (data: WebSocket.Data) => {
     try {
       const msg = JSON.parse(data.toString());
+      
+      if (msg.type === 'pong') {
+        if (pongTimeout) clearTimeout(pongTimeout);
+        return;
+      }
+
       console.log('[homeAssistantService]: Received message:', msg.type);
 
       if (msg.type === 'auth_required') {
@@ -50,12 +63,32 @@ export const connectToHomeAssistant = () => {
 
   ws.on('close', () => {
     console.log('[homeAssistantService]: WebSocket closed. Reconnecting in 10s...');
+    stopHeartbeat();
     setTimeout(connectToHomeAssistant, 10000);
   });
 
   ws.on('error', (err) => {
     console.error('[homeAssistantService]: WebSocket error:', err.message);
   });
+};
+
+const startHeartbeat = () => {
+  stopHeartbeat();
+  pingInterval = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ id: messageId++, type: 'ping' }));
+      
+      pongTimeout = setTimeout(() => {
+        console.warn('[homeAssistantService]: Heartbeat timeout! Closing connection.');
+        ws?.terminate();
+      }, 10000);
+    }
+  }, 30000);
+};
+
+const stopHeartbeat = () => {
+  if (pingInterval) clearInterval(pingInterval);
+  if (pongTimeout) clearTimeout(pongTimeout);
 };
 
 const subscribeToSensors = () => {

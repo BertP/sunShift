@@ -24,11 +24,15 @@ export const initDB = async () => {
         id SERIAL PRIMARY KEY,
         device_id VARCHAR(255) NOT NULL,
         device_name VARCHAR(255) NOT NULL,
-        scheduled_start TIMESTAMPTZ NOT NULL,
-        scheduled_end TIMESTAMPTZ NOT NULL,
+        scheduled_start TIMESTAMPTZ,
+        scheduled_end TIMESTAMPTZ,
+        earliest_start TIMESTAMPTZ,
+        latest_end TIMESTAMPTZ,
         status VARCHAR(50) DEFAULT 'SCHEDULED',
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+      ALTER TABLE device_schedules ADD COLUMN IF NOT EXISTS earliest_start TIMESTAMPTZ;
+      ALTER TABLE device_schedules ADD COLUMN IF NOT EXISTS latest_end TIMESTAMPTZ;
       CREATE TABLE IF NOT EXISTS miele_oauth_tokens (
         id SERIAL PRIMARY KEY,
         access_token TEXT NOT NULL,
@@ -72,6 +76,14 @@ export const initDB = async () => {
       );
       ALTER TABLE live_telemetry_history ADD COLUMN IF NOT EXISTS ev_power_w FLOAT DEFAULT 0;
       ALTER TABLE live_telemetry_history ADD COLUMN IF NOT EXISTS hp_power_w FLOAT DEFAULT 0;
+
+      CREATE TABLE IF NOT EXISTS callback_logs (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMPTZ DEFAULT NOW(),
+        device_id VARCHAR(255),
+        feature_type VARCHAR(50),
+        payload JSONB
+      );
     `);
 
 
