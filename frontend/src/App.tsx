@@ -128,23 +128,24 @@ function App() {
   const [isRebooting, setIsRebooting] = useState(false);
 
   const handleDateChange = (days: number) => {
-    const current = new Date(selectedDate);
+    const current = new Date(selectedDate + 'T00:00:00'); // Force local midnight
     current.setDate(current.getDate() + days);
     
     const today = new Date();
-    const tomorrow = new Date();
+    today.setHours(0,0,0,0);
+    const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
     if (current > tomorrow) return;
 
-    if (current.getDate() === tomorrow.getDate() && current.getMonth() === tomorrow.getMonth() && current.getFullYear() === tomorrow.getFullYear()) {
-      if (today.getHours() < 14) {
-        alert("Prognosen für morgen sind erst ab 14:00 Uhr verfügbar.");
-        return;
-      }
-    }
+    const newDateStr = current.toISOString().split('T')[0];
+    setSelectedDate(newDateStr);
 
-    setSelectedDate(current.toISOString().split('T')[0]);
+    // If switching to a date other than today, force forecast mode
+    const isToday = newDateStr === new Date().toISOString().split('T')[0];
+    if (!isToday && viewType === 'live') {
+      setViewType('forecast');
+    }
   };
 
   const [tickerPos, setTickerPos] = useState({ x: window.innerWidth - 450, y: 200 });
@@ -414,13 +415,20 @@ function App() {
     }
 
     fetchData();
-    const interval = setInterval(fetchData, 60000);
+    const interval = setInterval(fetchData, 300000); // 5 minutes (reduced frequency to rely on callback)
     return () => clearInterval(interval);
   }, [isMieleConnected, selectedDate]);
 
 
   const getDevicePowerAtTime = (device: any, time: Date): number => {
     if (!device) return 0;
+    
+    // If device is inactive, don't show any power consumption from ghost schedules
+    const deviceStatus = device.status?.toLowerCase();
+    if (deviceStatus === 'inactive' || deviceStatus === 'off' || deviceStatus === 'not_connected') {
+      return 0;
+    }
+
     let totalPower = 0;
 
     // 1. Add live schedule curve
@@ -521,6 +529,7 @@ function App() {
   // Build live data aligned with the 15‑minute forecast grid
   const livePvData = new Array(expandedLabels.length).fill(null);
   const liveGridData = new Array(expandedLabels.length).fill(null);
+  const liveHpData = new Array(expandedLabels.length).fill(null);
 
   // Map each live point to its corresponding 15‑minute slot, aligned with expandedLabels
   const firstPriceHour = prices.length ? new Date(prices[0].timestamp).getHours() : 0;
@@ -539,26 +548,156 @@ function App() {
     if (slotIdx >= 0 && slotIdx < livePvData.length) {
       livePvData[slotIdx] = pt.pv_power_w;
       liveGridData[slotIdx] = pt.grid_power_w;
+      liveHpData[slotIdx] = pt.hp_power_w;
     }
   });
 
+  // Force Day Bounds based on selected date (00:00 to 24:00 local time)
+  const startOfChart = new Date(selectedDate);
+  startOfChart.setHours(0, 0, 0, 0);
+  const endOfChart = new Date(startOfChart.getTime() + 24 * 60 * 60 * 1000);
+
+  // Prepare formatted data for the linear X-axis
+  const baseTime = startOfChart.getTime();
+  
+  const formattedPrices = expandedPrices.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: val
+  })).filter(p => p.x >= startOfChart.getTime() && p.x <= endOfChart.getTime());
+
+  const formattedSolar = expandedSolar.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: val
+  })).filter(s => s.x >= startOfChart.getTime() && s.x <= endOfChart.getTime());
+
+  const formattedWasher = washerPower.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: val
+  })).filter(p => p.x >= startOfChart.getTime() && p.x <= endOfChart.getTime());
+
+  const formattedDryer = dryerPower.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: val
+  })).filter(p => p.x >= startOfChart.getTime() && p.x <= endOfChart.getTime());
+
+  const formattedDishwasher = dishwasherPower.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: val
+  })).filter(p => p.x >= startOfChart.getTime() && p.x <= endOfChart.getTime());
+
+  const formattedEv = eUpPower.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: val
+  })).filter(e => e.x >= startOfChart.getTime() && e.x <= endOfChart.getTime());
+
+  // Live Data (only for today)
+  const isTodaySelected = selectedDate === new Date().toISOString().split('T')[0];
+  
+  const formattedLivePv = livePvData.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: isTodaySelected ? val : null
+  }));
+  const formattedLiveGrid = liveGridData.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: isTodaySelected ? val : null
+  }));
+  const formattedLiveHp = liveHpData.map((val, idx) => ({
+    x: baseTime + (idx * 15 * 60 * 1000),
+    y: isTodaySelected ? val : null
+  }));
+
+  const chartData = {
+    datasets: [
+      {
+        type: 'line' as const,
+        label: 'Electricity Price',
+        data: formattedPrices,
+        borderColor: '#818cf8',
+        backgroundColor: 'rgba(129, 140, 248, 0.2)',
+        fill: true,
+        tension: 0.4,
+        yAxisID: 'y',
+        order: 1
+      },
+      {
+        type: 'line' as const,
+        label: 'PV Forecast',
+        data: formattedSolar,
+        borderColor: '#fbbf24',
+        backgroundColor: 'rgba(251, 191, 36, 0.1)',
+        fill: true,
+        tension: 0.4,
+        yAxisID: 'y1',
+        order: 2
+      },
+      ...(visibleDatasets.includes('washer') ? [{
+        type: 'bar' as const,
+        label: 'Washer',
+        data: formattedWasher,
+        backgroundColor: 'rgba(34, 197, 94, 0.5)',
+        yAxisID: 'y1',
+        order: 3,
+        barPercentage: 1.0,
+        categoryPercentage: 1.0
+      }] : []),
+      ...(visibleDatasets.includes('dryer') ? [{
+        type: 'bar' as const,
+        label: 'Dryer',
+        data: formattedDryer,
+        backgroundColor: 'rgba(56, 189, 248, 0.5)',
+        yAxisID: 'y1',
+        order: 4,
+        barPercentage: 1.0,
+        categoryPercentage: 1.0
+      }] : []),
+      ...(visibleDatasets.includes('dishwasher') ? [{
+        type: 'bar' as const,
+        label: 'Dishwasher',
+        data: formattedDishwasher,
+        backgroundColor: 'rgba(249, 115, 22, 0.5)',
+        yAxisID: 'y1',
+        order: 5,
+        barPercentage: 1.0,
+        categoryPercentage: 1.0
+      }] : []),
+      ...(visibleDatasets.includes('eup') ? [{
+        type: 'bar' as const,
+        label: 'e-up! Charging',
+        data: formattedEv,
+        backgroundColor: 'rgba(236, 72, 153, 0.5)',
+        yAxisID: 'y1',
+        order: 6,
+        barPercentage: 1.0,
+        categoryPercentage: 1.0
+      }] : [])
+    ]
+  };
+
   const liveChartData = {
-    labels: expandedLabels,
     datasets: [
       {
         label: 'PV Ertrag (W)',
-        data: livePvData,
+        data: formattedLivePv,
         borderColor: '#fbbf24',
         backgroundColor: 'rgba(251, 189, 36, 0.1)',
         tension: 0.4,
         fill: true,
-        spanGaps: true // Connect the dots even if some slots are missing
+        spanGaps: true
       },
       {
         label: 'Netzstatus (W)',
-        data: liveGridData,
+        data: formattedLiveGrid,
         borderColor: '#38bdf8',
         backgroundColor: 'rgba(56, 189, 248, 0.1)',
+        tension: 0.4,
+        fill: true,
+        spanGaps: true
+      },
+      {
+        label: 'Wärmepumpe (W)',
+        data: formattedLiveHp,
+        borderColor: '#8b5cf6',
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
         tension: 0.4,
         fill: true,
         spanGaps: true
@@ -572,7 +711,13 @@ function App() {
     plugins: {
       legend: {
         position: 'top' as const,
-        labels: { color: '#f1f5f9' }
+        labels: { 
+          color: '#1e293b',
+          font: {
+            size: 12,
+            weight: 'bold'
+          }
+        }
       }
     },
     scales: {
@@ -581,81 +726,26 @@ function App() {
         ticks: { color: '#94a3b8' }
       },
       x: {
+        type: 'linear' as const,
         grid: { color: 'rgba(255,255,255,0.05)' },
-        ticks: { color: '#94a3b8', maxTicksLimit: 96 }
+        ticks: { 
+          color: '#94a3b8', 
+          maxTicksLimit: 12,
+          callback: (value: any) => {
+            const date = new Date(value);
+            return date.getHours().toString().padStart(2, '0') + ':00';
+          }
+        },
+        min: startOfChart.getTime(),
+        max: endOfChart.getTime()
       }
     }
   };
 
 
 
-  const chartData = {
-    labels: expandedLabels.length ? expandedLabels : ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-    datasets: [
-      ...(visibleDatasets.includes('price') ? [{
-        type: 'bar' as const,
-        label: 'Electricity Price (Cent/kWh)',
-        data: expandedPrices,
-        borderColor: '#a78bfa',
-        backgroundColor: 'rgba(167, 139, 250, 0.6)',
-        borderWidth: 1,
-        yAxisID: 'y',
-      }] : []),
-      ...(visibleDatasets.includes('pv') ? [{
-        type: 'line' as const,
-        label: 'PV Forecast (W)',
-        data: expandedSolar.length ? expandedSolar : [0,0,0,0,0,0],
-        borderColor: '#fbbf24',
-        backgroundColor: 'rgba(251, 191, 36, 0.1)',
-        borderWidth: 2,
-        fill: true,
-        tension: 0.4,
-        yAxisID: 'y1',
-        pointRadius: 0,
-        pointHitRadius: 10,
-      }] : []),
-      ...(visibleDatasets.includes('washer') ? [{
-        type: 'bar' as const,
-        label: 'Washer Forecast (W)',
-        data: washerPower,
-        borderColor: 'rgba(34, 197, 94, 0.8)',
-        backgroundColor: 'rgba(34, 197, 94, 0.6)',
-        borderWidth: 1,
-        yAxisID: 'y1',
-        stack: 'appliances',
-      }] : []),
-      ...(visibleDatasets.includes('dryer') ? [{
-        type: 'bar' as const,
-        label: 'Dryer Forecast (W)',
-        data: dryerPower,
-        borderColor: 'rgba(56, 189, 248, 0.8)',
-        backgroundColor: 'rgba(56, 189, 248, 0.6)',
-        borderWidth: 1,
-        yAxisID: 'y1',
-        stack: 'appliances',
-      }] : []),
-      ...(visibleDatasets.includes('dishwasher') ? [{
-        type: 'bar' as const,
-        label: 'Dishwasher Forecast (W)',
-        data: dishwasherPower,
-        borderColor: 'rgba(249, 115, 22, 0.8)',
-        backgroundColor: 'rgba(249, 115, 22, 0.6)',
-        borderWidth: 1,
-        yAxisID: 'y1',
-        stack: 'appliances',
-      }] : []),
-      ...(visibleDatasets.includes('eup') ? [{
-        type: 'bar' as const,
-        label: 'e-up! Charging (W)',
-        data: eUpPower,
-        borderColor: 'rgba(236, 72, 153, 0.8)',
-        backgroundColor: 'rgba(236, 72, 153, 0.6)',
-        borderWidth: 1,
-        yAxisID: 'y1',
-        stack: 'appliances',
-      }] : [])
-    ]
-  };
+
+  // Dynamic Sync Plugin: Automatically aligns GANTT padding with Chart grid area
 
 
 
@@ -678,27 +768,20 @@ function App() {
       const ctx = chart.ctx;
       const xAxis = chart.scales.x;
       const yAxis = chart.scales.y;
-      
-      if (!prices.length) return;
-      const now = new Date();
-      const firstPriceTime = new Date(prices[0].timestamp);
-      const elapsedMs = now.getTime() - firstPriceTime.getTime();
-      const index = elapsedMs / (1000 * 60 * 15);
-      const xPos = xAxis.left + (xAxis.width * (index / (expandedLabels.length || 96)));
-      
-      if (xPos < xAxis.left || xPos > xAxis.right) return;
+      const now = Date.now();
 
-
-      
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(xPos, yAxis.top);
-      ctx.lineTo(xPos, yAxis.bottom);
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = '#ef4444'; 
-      ctx.setLineDash([6, 4]);
-      ctx.stroke();
-      ctx.restore();
+      if (now >= xAxis.min && now <= xAxis.max) {
+        const x = xAxis.getPixelForValue(now);
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]);
+        ctx.moveTo(x, yAxis.top);
+        ctx.lineTo(x, yAxis.bottom);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#f43f5e';
+        ctx.stroke();
+        ctx.restore();
+      }
     }
   };
 
@@ -744,8 +827,17 @@ function App() {
         ticks: { color: '#94a3b8' }
       },
       x: {
+        type: 'linear' as const,
+        min: startOfChart.getTime(),
+        max: endOfChart.getTime(),
         grid: { color: 'rgba(148, 163, 184, 0.1)' },
-        ticks: { color: '#94a3b8' }
+        ticks: { 
+          color: '#94a3b8',
+          stepSize: 2 * 60 * 60 * 1000, // Every 2 hours
+          callback: function(value: any) {
+            return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
+        }
       }
     }
   };
@@ -1379,9 +1471,9 @@ function App() {
 
           <GanttTimeline 
             devices={devices}
-            prices={prices}
             powerSequences={powerSequences}
             powerTimeSlots={powerTimeSlots}
+            selectedDate={selectedDate}
           />
 
             {/* Date Pagination Footer */}

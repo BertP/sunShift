@@ -21,13 +21,13 @@ export const updateTelemetry = async (pv: number | null, grid: number | null, eu
 
   try {
     await pool.query(
-      "INSERT INTO live_telemetry_history (pv_power_w, grid_power_w, ev_power_w, hp_power_w) VALUES ($1, $2, $3, $4)",
-      [liveTelemetry.pvLeistung, liveTelemetry.netzzustand, liveTelemetry.eUpPower, liveTelemetry.heatPumpPower]
+      "INSERT INTO live_telemetry_history (pv_power_w, grid_power_w, ev_power_w, hp_power_w, battery_level, battery_state) VALUES ($1, $2, $3, $4, $5, $6)",
+      [liveTelemetry.pvLeistung, liveTelemetry.netzzustand, liveTelemetry.eUpPower, liveTelemetry.heatPumpPower, liveTelemetry.batteryLevel, liveTelemetry.batteryState]
     );
     
-    // Prune anything older than 7 days
+    // Prune anything older than 30 days
     await pool.query(
-      "DELETE FROM live_telemetry_history WHERE timestamp < NOW() - INTERVAL '7 days'"
+      "DELETE FROM live_telemetry_history WHERE timestamp < NOW() - INTERVAL '30 days'"
     );
   } catch (dbErr) {
     console.error('[telemetryStore]: Failed logging real-time values:', dbErr);

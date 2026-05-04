@@ -33,12 +33,16 @@ export const getPrices = async (dateString?: string) => {
   let params: any[] = [];
 
   if (dateString) {
+    const start = new Date(dateString);
+    start.setHours(0,0,0,0);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+    
     query = `
       SELECT * FROM prices 
-      WHERE timestamp::date = $1::date 
+      WHERE timestamp >= $1 AND timestamp < $2 
       ORDER BY timestamp ASC
     `;
-    params = [dateString];
+    params = [start.toISOString(), end.toISOString()];
   }
   
   const result = await pool.query(query, params);

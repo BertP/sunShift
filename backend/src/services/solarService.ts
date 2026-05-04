@@ -68,33 +68,7 @@ export const fetchAndStoreSolarForecast = async () => {
     }
   } catch (err: any) {
     console.error('[solarService]: Failed to fetch or store solar forecast', err.message);
-    // If API limits hit, we could mock data for testing
-    console.log('[solarService]: Falling back to mock data for development');
-    await storeMockSolarData();
-  }
-};
-
-const storeMockSolarData = async () => {
-  const client = await pool.connect();
-  try {
-    const now = new Date();
-    for (let i = 0; i < 24; i++) {
-      const timestamp = new Date(now.getFullYear(), now.getMonth(), now.getDate(), i, 0, 0);
-      // Bell curve for solar production peaking at noon
-      const hour = i;
-      let wattHours = 0;
-      if (hour >= 6 && hour <= 18) {
-        wattHours = Math.sin((hour - 6) / 12 * Math.PI) * 8000; // Peak 8kW
-      }
-
-      await client.query(`
-        INSERT INTO pv_forecast (timestamp, watt_hours)
-        VALUES ($1, $2)
-        ON CONFLICT (timestamp) DO UPDATE SET watt_hours = EXCLUDED.watt_hours
-      `, [timestamp, wattHours]);
-    }
-  } finally {
-    client.release();
+    // FALLBACK REMOVED AS PER USER REQUEST
   }
 };
 
@@ -103,12 +77,16 @@ export const getSolarForecast = async (dateString?: string) => {
   let params: any[] = [];
 
   if (dateString) {
+    const start = new Date(dateString);
+    start.setHours(0,0,0,0);
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
     query = `
       SELECT * FROM pv_forecast 
-      WHERE timestamp::date = $1::date 
+      WHERE timestamp >= $1 AND timestamp < $2 
       ORDER BY timestamp ASC
     `;
-    params = [dateString];
+    params = [start.toISOString(), end.toISOString()];
   }
 
   const result = await pool.query(query, params);

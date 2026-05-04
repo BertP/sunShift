@@ -249,6 +249,11 @@ export const getSpineDevices = async () => {
 
 export const getPowerSequence = async (deviceId: string, currentStatus?: string) => {
   const status = currentStatus?.toLowerCase() || 'unknown';
+  
+  // If the device is definitively INACTIVE or OFF, we don't want to show any ghost schedules.
+  if (status === 'inactive' || status === 'off' || status === 'not_connected') {
+    return { state: 'inactive' };
+  }
 
   // DB-First: Check if we have a RECENT schedule/sequence in DB (max 15 mins old)
   try {
@@ -287,17 +292,105 @@ export const getPowerSequence = async (deviceId: string, currentStatus?: string)
     addApiLog('GET', `/features/powerSequence?deviceId=${deviceId}`, response.data);
     if (Array.isArray(response.data)) {
       const seqObj = response.data.find((item: any) => item.deviceId === deviceId);
-      return seqObj ? seqObj.data : null;
+      const data = seqObj ? seqObj.data : null;
+      
+      if (data) {
+        const state = (data.state || '').toLowerCase();
+        if (state === 'scheduled' || state === 'running') {
+          // Ensure we have slots persisted for the current cycle
+          await refreshPowerTimeSlots(deviceId);
+        } else if (state === 'inactive' || state === 'off') {
+          // Cleanup at end of cycle
+          await clearPowerTimeSlots(deviceId);
+        }
+      }
+      return data;
     }
-    return response.data;
+    
+    const data = response.data;
+    if (data) {
+      const state = (data.state || '').toLowerCase();
+      if (state === 'scheduled' || state === 'running') {
+        await refreshPowerTimeSlots(deviceId);
+      } else if (state === 'inactive' || state === 'off') {
+        await clearPowerTimeSlots(deviceId);
+      }
+    }
+    return data;
   } catch (error: any) {
     console.error(`[spineService]: Failed to fetch power sequence for ${deviceId}:`, error.response?.data || error.message);
     throw new Error(`Failed to fetch power sequence for ${deviceId}: ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`);
   }
 };
 
+export const clearPowerTimeSlots = async (deviceId: string) => {
+  try {
+    await pool.query('DELETE FROM dynamic_power_slots WHERE device_id = $1', [deviceId]);
+    console.log(`[spineService]: Cleared power slots for ${deviceId}`);
+  } catch (err) {
+    console.error(`[spineService]: Failed to clear slots for ${deviceId}:`, err);
+  }
+};
+
+const iso8601ToMinutes = (duration: string): number => {
+  if (!duration) return 15; // Default fallback
+  const matches = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!matches) return 15;
+  const hours = parseInt(matches[1] || '0');
+  const mins = parseInt(matches[2] || '0');
+  const secs = parseInt(matches[3] || '0');
+  return (hours * 60) + mins + (secs / 60);
+};
+
+export const refreshPowerTimeSlots = async (deviceId: string) => {
+  // First check if we already have slots to avoid redundant cloud calls
+  try {
+    const check = await pool.query('SELECT 1 FROM dynamic_power_slots WHERE device_id = $1 LIMIT 1', [deviceId]);
+    if (check.rows.length > 0) return; // Already persisted for this cycle
+  } catch (err) {}
+
+  const token = getAccessToken();
+  console.log(`[spineService]: Refreshing and persisting power slots for ${deviceId}...`);
+
+  try {
+    const response = await axios.get(`https://ems.domestic.miele-iot.com/v1/features/powerTimeSlot?deviceId=${deviceId}`, {
+      headers: {
+        'Authorization': `Bearer ${token || 'mock-token-poc'}`,
+        'Accept': 'application/json',
+      }
+    });
+
+    // Miele API returns a flat array of feature objects based on the user's provided JSON
+    const features = Array.isArray(response.data) ? response.data : [];
+    
+    if (features.length > 0) {
+      // Clear old just in case
+      await pool.query('DELETE FROM dynamic_power_slots WHERE device_id = $1', [deviceId]);
+      
+      // Persist new slots
+      for (let i = 0; i < features.length; i++) {
+        const feature = features[i];
+        const slotData = feature.data;
+        if (!slotData) continue;
+
+        const durationMinutes = iso8601ToMinutes(slotData.defaultDuration);
+        const powerW = slotData.power?.number || 0;
+        const slotNum = slotData.slotNumber ?? i;
+
+        await pool.query(
+          'INSERT INTO dynamic_power_slots (device_id, slot_number, duration_minutes, power_w) VALUES ($1, $2, $3, $4)',
+          [deviceId, slotNum, durationMinutes, powerW]
+        );
+      }
+      console.log(`[spineService]: Persisted ${features.length} slots for ${deviceId}`);
+    }
+  } catch (error: any) {
+    console.error(`[spineService]: Failed to refresh power slots for ${deviceId}:`, error.message);
+  }
+};
+
 export const getPowerTimeSlot = async (deviceId: string) => {
-  // DB-First: Check dynamic_power_slots
+  // DB-Only: We now rely on the persistent lifecycle triggered by getPowerSequence
   try {
     const dbSlots = await pool.query(
       'SELECT slot_number, duration_minutes, power_w FROM dynamic_power_slots WHERE device_id = $1 ORDER BY slot_number ASC',
@@ -305,7 +398,6 @@ export const getPowerTimeSlot = async (deviceId: string) => {
     );
     
     if (dbSlots.rows.length > 0) {
-      console.log(`[spineService]: Using DB-cached time slots for ${deviceId}`);
       const timeSlots = dbSlots.rows.map((r: any, idx: number) => ({
         chunkIndex: idx,
         durationMinutes: r.duration_minutes,
@@ -317,22 +409,7 @@ export const getPowerTimeSlot = async (deviceId: string) => {
     console.error('[spineService]: DB lookup failed for power time slots:', dbErr);
   }
 
-  const token = getAccessToken();
-  console.log(`[spineService]: Requesting power time slot from Miele Cloud for ${deviceId}...`);
-
-  try {
-    const response = await axios.get(`https://ems.domestic.miele-iot.com/v1/features/powerTimeSlot?deviceId=${deviceId}`, {
-      headers: {
-        'Authorization': `Bearer ${token || 'mock-token-poc'}`,
-        'Accept': 'application/json',
-      }
-    });
-
-    return response.data;
-  } catch (error: any) {
-    console.error(`[spineService]: Failed to fetch power time slot for ${deviceId}:`, error.response?.data || error.message);
-    throw new Error(`Kein dynamischer Lastgang verfügbar für dieses Gerät (${deviceId})`);
-  }
+  return null; // Return null if not in cycle
 };
 
 

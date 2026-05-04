@@ -123,7 +123,7 @@ app.get('/api/telemetry-history', async (req: Request, res: Response) => {
     if (!date) return res.status(400).json({ error: 'Date query param required' });
 
     const result = await pool.query(
-      `SELECT id, timestamp, pv_power_w, grid_power_w, ev_power_w 
+      `SELECT id, timestamp, pv_power_w, grid_power_w, ev_power_w, hp_power_w 
        FROM live_telemetry_history 
        WHERE timestamp::date = $1::date 
        ORDER BY timestamp ASC`,
