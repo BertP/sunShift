@@ -136,9 +136,12 @@ function App() {
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
-    if (current > tomorrow) return;
+    if (current.getTime() > tomorrow.getTime()) return;
 
-    const newDateStr = current.toISOString().split('T')[0];
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    const newDateStr = `${y}-${m}-${d}`;
     setSelectedDate(newDateStr);
 
     // If switching to a date other than today, force forecast mode
@@ -527,33 +530,8 @@ function App() {
   });
 
   // Build live data aligned with the 15‑minute forecast grid
-  const livePvData = new Array(expandedLabels.length).fill(null);
-  const liveGridData = new Array(expandedLabels.length).fill(null);
-  const liveHpData = new Array(expandedLabels.length).fill(null);
-
-  // Map each live point to its corresponding 15‑minute slot, aligned with expandedLabels
-  const firstPriceHour = prices.length ? new Date(prices[0].timestamp).getHours() : 0;
-  
-  liveHistory.forEach((pt: any) => {
-    const d = new Date(pt.timestamp);
-    const hour = d.getHours();
-    const minute = d.getMinutes();
-    
-    // Calculate index relative to the start of the chart (prices[0])
-    let slotIdx = (hour - firstPriceHour) * 4 + Math.floor(minute / 15);
-    
-    // Handle wrap-around if needed (though usually we are within a 24-48h window)
-    if (slotIdx < 0) slotIdx += 96; 
-
-    if (slotIdx >= 0 && slotIdx < livePvData.length) {
-      livePvData[slotIdx] = pt.pv_power_w;
-      liveGridData[slotIdx] = pt.grid_power_w;
-      liveHpData[slotIdx] = pt.hp_power_w;
-    }
-  });
-
   // Force Day Bounds based on selected date (00:00 to 24:00 local time)
-  const startOfChart = new Date(selectedDate);
+  const startOfChart = new Date(selectedDate + 'T00:00:00');
   startOfChart.setHours(0, 0, 0, 0);
   const endOfChart = new Date(startOfChart.getTime() + 24 * 60 * 60 * 1000);
 
@@ -593,18 +571,20 @@ function App() {
   // Live Data (only for today)
   const isTodaySelected = selectedDate === new Date().toISOString().split('T')[0];
   
-  const formattedLivePv = livePvData.map((val, idx) => ({
-    x: baseTime + (idx * 15 * 60 * 1000),
-    y: isTodaySelected ? val : null
-  }));
-  const formattedLiveGrid = liveGridData.map((val, idx) => ({
-    x: baseTime + (idx * 15 * 60 * 1000),
-    y: isTodaySelected ? val : null
-  }));
-  const formattedLiveHp = liveHpData.map((val, idx) => ({
-    x: baseTime + (idx * 15 * 60 * 1000),
-    y: isTodaySelected ? val : null
-  }));
+  const formattedLivePv = liveHistory.map((pt: any) => ({
+    x: new Date(pt.timestamp).getTime(),
+    y: isTodaySelected ? pt.pv_power_w : null
+  })).filter(e => e.x >= startOfChart.getTime() && e.x <= endOfChart.getTime());
+
+  const formattedLiveGrid = liveHistory.map((pt: any) => ({
+    x: new Date(pt.timestamp).getTime(),
+    y: isTodaySelected ? pt.grid_power_w : null
+  })).filter(e => e.x >= startOfChart.getTime() && e.x <= endOfChart.getTime());
+
+  const formattedLiveHp = liveHistory.map((pt: any) => ({
+    x: new Date(pt.timestamp).getTime(),
+    y: isTodaySelected ? pt.hp_power_w : null
+  })).filter(e => e.x >= startOfChart.getTime() && e.x <= endOfChart.getTime());
 
   const chartData = {
     datasets: [
@@ -673,34 +653,51 @@ function App() {
     ]
   };
 
+  const smoothData = (data: any[], windowSize: number = 3) => {
+    return data.map((point, index, array) => {
+      if (point.y === null) return point;
+      const start = Math.max(0, index - Math.floor(windowSize / 2));
+      const end = Math.min(array.length, index + Math.ceil(windowSize / 2));
+      const slice = array.slice(start, end).filter(p => p.y !== null);
+      const avg = slice.reduce((sum, p) => sum + p.y, 0) / slice.length;
+      return { ...point, y: avg };
+    });
+  };
+
   const liveChartData = {
     datasets: [
       {
         label: 'PV Ertrag (W)',
-        data: formattedLivePv,
+        data: smoothData(formattedLivePv),
         borderColor: '#fbbf24',
         backgroundColor: 'rgba(251, 189, 36, 0.1)',
-        tension: 0.4,
+        tension: 0.5,
         fill: true,
-        spanGaps: true
+        spanGaps: true,
+        pointRadius: 0,
+        hitRadius: 10
       },
       {
         label: 'Netzstatus (W)',
-        data: formattedLiveGrid,
+        data: smoothData(formattedLiveGrid),
         borderColor: '#38bdf8',
         backgroundColor: 'rgba(56, 189, 248, 0.1)',
-        tension: 0.4,
+        tension: 0.5,
         fill: true,
-        spanGaps: true
+        spanGaps: true,
+        pointRadius: 0,
+        hitRadius: 10
       },
       {
         label: 'Wärmepumpe (W)',
-        data: formattedLiveHp,
+        data: smoothData(formattedLiveHp),
         borderColor: '#8b5cf6',
         backgroundColor: 'rgba(139, 92, 246, 0.1)',
-        tension: 0.4,
+        tension: 0.5,
         fill: true,
-        spanGaps: true
+        spanGaps: true,
+        pointRadius: 0,
+        hitRadius: 10
       }
     ]
   };
@@ -716,6 +713,27 @@ function App() {
           font: {
             size: 12,
             weight: 'bold'
+          }
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+        titleColor: '#f1f5f9',
+        bodyColor: '#cbd5e1',
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: true,
+        boxPadding: 6,
+        usePointStyle: true,
+        callbacks: {
+          title: (context: any) => {
+            const timestamp = context[0].raw.x;
+            return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+          },
+          label: (context: any) => {
+            const label = context.dataset.label || '';
+            const value = context.parsed.y;
+            return `${label}: ${Math.round(value)} W`;
           }
         }
       }
@@ -799,15 +817,29 @@ function App() {
     plugins: {
       legend: {
         display: false,
-
-        labels: { 
-          color: '#0f172a',
-          font: {
-            weight: 'bold' as const,
-            size: 13
+      },
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+        titleColor: '#f1f5f9',
+        bodyColor: '#cbd5e1',
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: true,
+        boxPadding: 6,
+        usePointStyle: true,
+        callbacks: {
+          title: (context: any) => {
+            const timestamp = context[0].raw.x;
+            return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' Uhr';
+          },
+          label: (context: any) => {
+            const label = context.dataset.label || '';
+            const value = context.parsed.y;
+            const unit = context.dataset.yAxisID === 'y' ? ' Cent/kWh' : ' W';
+            return `${label}: ${Math.round(value)}${unit}`;
           }
         }
-      },
+      }
     },
     scales: {
       y: {
