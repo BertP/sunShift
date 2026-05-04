@@ -122,12 +122,15 @@ app.get('/api/telemetry-history', async (req: Request, res: Response) => {
     const { date } = req.query;
     if (!date) return res.status(400).json({ error: 'Date query param required' });
 
+    const start = new Date(date as string + 'T00:00:00');
+    const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+
     const result = await pool.query(
-      `SELECT id, timestamp, pv_power_w, grid_power_w, ev_power_w, hp_power_w 
+      `SELECT timestamp, pv_power_w, grid_power_w, ev_power_w, hp_power_w, battery_level, battery_state 
        FROM live_telemetry_history 
-       WHERE timestamp::date = $1::date 
+       WHERE timestamp >= $1 AND timestamp < $2 
        ORDER BY timestamp ASC`,
-      [date]
+      [start.toISOString(), end.toISOString()]
     );
 
     res.json(result.rows);
