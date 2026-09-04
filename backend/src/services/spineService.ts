@@ -1,5 +1,5 @@
 import pool from '../db';
-import { addApiLog } from './logService';
+import { addApiLog, addProtocolEntry } from './logService';
 
 export interface SpineDevice {
   id: string;
@@ -57,6 +57,7 @@ export const getSpineDevices = async () => {
 
   try {
     console.log('[spineService]: Fetching live devices from Miele Cloud...');
+    addProtocolEntry({ direction: 'OUT', category: 'query', method: 'GET', endpoint: '/v1/devices', requestPayload: null });
     const response = await axios.get('https://ems.domestic.miele-iot.com/v1/devices', {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -65,6 +66,7 @@ export const getSpineDevices = async () => {
     });
 
     addApiLog('GET', '/devices', response.data);
+    addProtocolEntry({ direction: 'IN', category: 'query', method: 'GET', endpoint: '/v1/devices', statusCode: response.status, responsePayload: response.data });
 
     // Map Miele payload to SpineDevice
     // Miele often returns an array, or an object where keys are serial numbers.
@@ -115,6 +117,7 @@ export const getSpineDevices = async () => {
             }
           };
 
+          addProtocolEntry({ direction: 'OUT', category: 'binding', method: 'POST', endpoint: '/v1/bindings', deviceId: dev.id, requestPayload: payload });
           const bindRes = await axios.post('https://ems.domestic.miele-iot.com/v1/bindings', payload, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -129,6 +132,7 @@ export const getSpineDevices = async () => {
             requestPayload: payload,
             responsePayload: bindRes.data
           });
+          addProtocolEntry({ direction: 'IN', category: 'binding', method: 'POST', endpoint: '/v1/bindings', deviceId: dev.id, statusCode: bindRes.status, responsePayload: bindRes.data });
           boundDevices.add(dev.id);
           const bId = bindRes.data?.bindingId || 'N/A';
           const exp = bindRes.data?.expires || 'Unlimited';
@@ -141,6 +145,7 @@ export const getSpineDevices = async () => {
             requestPayload: { deviceId: dev.id },
             error: bindError.response?.data || bindError.message
           });
+          addProtocolEntry({ direction: 'IN', category: 'binding', method: 'POST', endpoint: '/v1/bindings', deviceId: dev.id, statusCode: bindError.response?.status || 500, errorMessage: bindError.response?.data ? JSON.stringify(bindError.response.data) : bindError.message });
         }
       }
     }
@@ -162,6 +167,7 @@ export const getSpineDevices = async () => {
             }
           };
           
+          addProtocolEntry({ direction: 'OUT', category: 'subscription', method: 'POST', endpoint: '/v1/subscriptions', deviceId: dev.id, requestPayload: subPayload });
           const subRes = await axios.post('https://ems.domestic.miele-iot.com/v1/subscriptions', subPayload, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -176,12 +182,14 @@ export const getSpineDevices = async () => {
             requestPayload: subPayload,
             responsePayload: subRes.data
           });
+          addProtocolEntry({ direction: 'IN', category: 'subscription', method: 'POST', endpoint: '/v1/subscriptions', deviceId: dev.id, statusCode: subRes.status, responsePayload: subRes.data });
         } catch (subErr: any) {
           console.error(`[spineService]: Failed to subscribe device ${dev.id}:`, subErr.response?.data || subErr.message);
           addApiLog('POST', '/subscriptions [ERROR]', {
             statusCode: subErr.response?.status || 500,
             error: subErr.response?.data || subErr.message
           });
+          addProtocolEntry({ direction: 'IN', category: 'subscription', method: 'POST', endpoint: '/v1/subscriptions', deviceId: dev.id, statusCode: subErr.response?.status || 500, errorMessage: subErr.response?.data ? JSON.stringify(subErr.response.data) : subErr.message });
         }
       }
     }

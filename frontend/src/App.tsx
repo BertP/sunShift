@@ -25,6 +25,7 @@ import { Bar, Line } from 'react-chartjs-2';
 
 import { FloatingPanels } from './components/FloatingPanels';
 import { GanttTimeline } from './components/GanttTimeline';
+import { SpineProtocolMonitor } from './components/SpineProtocolMonitor';
 import packageJson from '../package.json';
 
 
@@ -123,6 +124,7 @@ function App() {
 
   const [apiLogs, setApiLogs] = useState<any[]>([]);
   const [isLogsDetached, setIsLogsDetached] = useState(false);
+  const [isProtocolMonitorOpen, setIsProtocolMonitorOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'customer' | 'developer'>('developer');
   const [showHelp, setShowHelp] = useState(false);
   const [isRebooting, setIsRebooting] = useState(false);
@@ -1225,13 +1227,23 @@ function App() {
             <div className="api-logs-list" style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <h3 style={{ fontSize: '1rem', color: 'var(--text-secondary)', margin: 0 }}>API Activity Logs:</h3>
-                <button 
-                  type="button"
-                  onClick={() => setIsLogsDetached(!isLogsDetached)} 
-                  style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  {isLogsDetached ? '📌 Attach Log' : '↗️ Detach Log'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button 
+                    type="button"
+                    onClick={() => setIsProtocolMonitorOpen(!isProtocolMonitorOpen)} 
+                    style={{ background: isProtocolMonitorOpen ? 'rgba(56, 189, 248, 0.25)' : 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', border: `1px solid ${isProtocolMonitorOpen ? '#38bdf8' : 'rgba(56,189,248,0.35)'}`, padding: '0.25rem 0.75rem', borderRadius: '0.25rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isProtocolMonitorOpen ? '#22c55e' : '#38bdf8', boxShadow: isProtocolMonitorOpen ? '0 0 6px #22c55e' : 'none', display: 'inline-block' }} />
+                    🔬 Protocol Inspector
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setIsLogsDetached(!isLogsDetached)} 
+                    style={{ background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    {isLogsDetached ? '📌 Attach Log' : '↗️ Detach Log'}
+                  </button>
+                </div>
               </div>
               
               {!isLogsDetached ? (
@@ -1702,6 +1714,10 @@ function App() {
         <p>&copy; 2026 SunShift EMS | Smart Energy. Perfect Timing. | {import.meta.env.VITE_APP_VERSION || `v${packageJson.version}`}</p>
 
       </footer>
+      <SpineProtocolMonitor
+        isOpen={isProtocolMonitorOpen}
+        onClose={() => setIsProtocolMonitorOpen(false)}
+      />
       <FloatingPanels 
         isLogsDetached={isLogsDetached}
         setIsLogsDetached={setIsLogsDetached}

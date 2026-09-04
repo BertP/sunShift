@@ -230,10 +230,53 @@ app.post('/api/spine/configure', async (req: Request, res: Response) => {
   }
 });
 
-import { getApiLogs } from './services/logService';
+import { getApiLogs, addProtocolEntry, getProtocolLog, clearProtocolLog, protocolEmitter } from './services/logService';
 
 app.get('/api/miele/logs', (req: Request, res: Response) => {
   res.json(getApiLogs());
+});
+
+app.get('/api/spine/protocol-log', (req: Request, res: Response) => {
+  res.json(getProtocolLog());
+});
+
+app.delete('/api/spine/protocol-log', (req: Request, res: Response) => {
+  clearProtocolLog();
+  res.json({ success: true, message: 'Protocol log cleared' });
+});
+
+// Server-Sent Events (SSE) for event-driven real-time protocol monitoring
+app.get('/api/spine/protocol-stream', (req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable proxy buffering (nginx)
+  res.flushHeaders();
+
+  // Send initial connected event + full backlog
+  res.write(`data: ${JSON.stringify({ type: 'init', data: getProtocolLog() })}\n\n`);
+
+  const onNewEntry = (entry: any) => {
+    res.write(`data: ${JSON.stringify({ type: 'entry', data: entry })}\n\n`);
+  };
+
+  const onClear = () => {
+    res.write(`data: ${JSON.stringify({ type: 'clear' })}\n\n`);
+  };
+
+  protocolEmitter.on('new_entry', onNewEntry);
+  protocolEmitter.on('clear', onClear);
+
+  // Keep-alive heartbeat every 15s
+  const heartbeat = setInterval(() => {
+    res.write(': heartbeat\n\n');
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    protocolEmitter.off('new_entry', onNewEntry);
+    protocolEmitter.off('clear', onClear);
+  });
 });
 
 import { exchangeCodeForToken, isConnected, disconnectMiele, loadTokensFromDB } from './services/mieleAuthService';
@@ -379,6 +422,8 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
       }
     };
 
+    addProtocolEntry({ direction: 'OUT', category: 'command', method: 'POST', endpoint: '/v1/usecaseInterfaces/flexibleStartForWhiteGoods/v1', deviceId: id as string, requestPayload: payload });
+
     const response = await axios.post('https://ems.domestic.miele-iot.com/v1/usecaseInterfaces/flexibleStartForWhiteGoods/v1', payload, {
       headers: {
         'Authorization': `Bearer ${token || 'mock-token-poc'}`,
@@ -392,6 +437,7 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
       requestPayload: payload,
       responsePayload: response.data
     });
+    addProtocolEntry({ direction: 'IN', category: 'command', method: 'POST', endpoint: '/v1/usecaseInterfaces/flexibleStartForWhiteGoods/v1', deviceId: id as string, statusCode: response.status, responsePayload: response.data });
 
     try {
       const { getPowerTimeSlot } = require('./services/spineService');
@@ -436,6 +482,16 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
             'INSERT INTO callback_logs (device_id, feature_type, payload) VALUES ($1, $2, $3)',
             [devId, featType, JSON.stringify(item)]
           );
+          // Add protocol entry for incoming callback
+          addProtocolEntry({
+            direction: 'IN',
+            category: 'callback',
+            method: 'PUSH',
+            endpoint: '/api/spine/callback',
+            deviceId: devId,
+            featureType: featType,
+            requestPayload: item,
+          });
         } catch (dbLogErr) {
           console.error('[spineCallback]: Failed to persist callback log:', dbLogErr);
         }
