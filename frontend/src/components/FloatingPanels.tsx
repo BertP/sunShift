@@ -16,6 +16,29 @@ interface FloatingPanelsProps {
   setRel: (rel: { x: number; y: number }) => void;
 }
 
+const formatTime = (ts: string | Date | undefined): string => {
+  if (!ts) return '--:--:--';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return String(ts);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${hh}:${mm}:${ss}`;
+};
+
+const formatDateTime = (ts: string | Date | undefined): string => {
+  if (!ts) return '--:--:--';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return String(ts);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${day}.${month}.${year}, ${hh}:${mm}:${ss}`;
+};
+
 export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
   isLogsDetached,
   setIsLogsDetached,
@@ -100,9 +123,9 @@ export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
                 borderRadius: '0.5rem',
                 border: '1px solid rgba(168, 85, 247, 0.25)'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#a855f7', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c084fc', fontWeight: 'bold', marginBottom: '0.25rem' }}>
                   <span>✨ {log.endpoint}</span>
-                  <span style={{ color: '#64748b', fontSize: '0.75rem' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                  <span style={{ color: '#e2e8f0', background: 'rgba(0,0,0,0.3)', padding: '0.1rem 0.4rem', borderRadius: '3px', fontSize: '0.75rem', fontFamily: 'monospace' }}>{formatTime(log.timestamp)}</span>
                 </div>
                 <pre style={{ whiteSpace: 'pre-wrap', color: '#f1f5f9', margin: 0, fontSize: '0.85rem', lineHeight: 1.5 }}>
                   {displayContent}
@@ -111,7 +134,7 @@ export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
             );
           })}
           {apiLogs.filter(log => log.method === 'STORY').length === 0 && (
-            <p style={{ color: '#64748b', textAlign: 'center', marginTop: '2rem' }}>Warte auf System-Ereignisse...</p>
+            <p style={{ color: '#94a3b8', textAlign: 'center', marginTop: '2rem' }}>Warte auf System-Ereignisse...</p>
           )}
         </div>
       </div>
@@ -173,10 +196,15 @@ export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
 
             return (
               <div key={log.id} style={{ marginBottom: '0.75rem', padding: '0.5rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.25rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#22c55e', fontWeight: 'bold', fontSize: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: '#4ade80', fontWeight: 'bold', fontSize: '0.75rem' }}>
                   <span>📥 {log.feature_type}</span>
-                  <span style={{ color: '#64748b' }}>{new Date(log.timestamp).toLocaleString()}</span>
+                  <span style={{ color: '#cbd5e1', background: 'rgba(0,0,0,0.4)', padding: '0.1rem 0.4rem', borderRadius: '3px', fontWeight: 600 }}>{formatDateTime(log.timestamp)}</span>
                 </div>
+                {log.device_id && (
+                  <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.1rem' }}>
+                    🔌 Device: <span style={{ color: '#fbbf24', fontFamily: 'monospace' }}>{log.device_id}</span>
+                  </div>
+                )}
                 <pre style={{ whiteSpace: 'pre-wrap', color: '#94a3b8', margin: '0.25rem 0 0 0', fontSize: '0.75rem' }}>
                   {payloadStr}
                 </pre>
@@ -184,7 +212,7 @@ export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
             );
           })}
           {callbackLogs.length === 0 && (
-            <p style={{ color: '#64748b', textAlign: 'center', marginTop: '2rem' }}>Keine persistenten Callbacks gefunden.</p>
+            <p style={{ color: '#94a3b8', textAlign: 'center', marginTop: '2rem' }}>Keine persistenten Callbacks gefunden.</p>
           )}
         </div>
       </div>
@@ -259,7 +287,7 @@ export const FloatingPanels: React.FC<FloatingPanelsProps> = ({
                 paddingBottom: '0.5rem', 
                 borderBottom: '1px solid rgba(255,255,255,0.05)'
               }}>
-                <span style={{ color: '#60a5fa' }}>[{new Date(log.timestamp).toLocaleTimeString()}] </span>
+                <span style={{ color: '#38bdf8', fontWeight: 600 }}>[{formatTime(log.timestamp)}] </span>
                 <span style={{ color: '#34d399', fontWeight: 'bold' }}>{log.method} </span>
                 <span style={{ color: '#fbbf24' }}>{log.endpoint}</span>
                 <details style={{ marginTop: '0.25rem', color: '#94a3b8' }}>

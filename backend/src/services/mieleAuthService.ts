@@ -59,6 +59,24 @@ export const loadTokensFromDB = async () => {
 export const getAccessToken = () => currentTokens?.access_token;
 export const isConnected = () => !!currentTokens;
 
+export const getAuthorizedDeviceIds = (): string[] | null => {
+  const token = currentTokens?.access_token;
+  if (!token) return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length >= 2) {
+      const payloadJson = Buffer.from(parts[1], 'base64').toString('utf-8');
+      const payload = JSON.parse(payloadJson);
+      if (Array.isArray(payload.devices)) {
+        return payload.devices.map((id: any) => String(id));
+      }
+    }
+  } catch (err) {
+    console.error('[mieleAuth]: Failed to parse devices from JWT token:', err);
+  }
+  return null;
+};
+
 export const exchangeCodeForToken = async (code: string) => {
   const tokenUrl = 'https://auth.domestic.miele-iot.com/partner/realms/mcs/protocol/openid-connect/token';
   const clientId = process.env.MIELE_CLIENT_ID;

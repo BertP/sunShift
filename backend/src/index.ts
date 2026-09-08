@@ -3,7 +3,17 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { initDB } from './db';
 import { connectToHomeAssistant } from './services/homeAssistantService';
-
+import { getPrices, fetchAndStorePrices } from './services/priceService';
+import { getSolarForecast, fetchAndStoreSolarForecast } from './services/solarService';
+import { getMieleDevices } from './services/mieleService';
+import { runOptimization } from './services/emsService';
+import { liveTelemetry } from './services/telemetryStore';
+import { getSpineDevices, configureSpineApi, getPowerSequence, getPowerTimeSlot, syncAllDevices, clearBoundDevices, invalidateDeviceCache } from './services/spineService';
+import { getApiLogs, addApiLog, addProtocolEntry, getProtocolLog, clearProtocolLog, clearApiLogs, protocolEmitter } from './services/logService';
+import { getAccessToken, getAuthorizedDeviceIds, exchangeCodeForToken, isConnected, disconnectMiele, loadTokensFromDB } from './services/mieleAuthService';
+import { getConfig } from './services/configService';
+import axios from 'axios';
+import pool from './db';
 
 dotenv.config();
 
@@ -24,14 +34,6 @@ app.get('/api/health', (req: Request, res: Response) => {
 app.get('/api/telemetry', (req: Request, res: Response) => {
   res.json(liveTelemetry);
 });
-
-import { getPrices, fetchAndStorePrices } from './services/priceService';
-import { getSolarForecast, fetchAndStoreSolarForecast } from './services/solarService';
-import { getMieleDevices } from './services/mieleService';
-import { runOptimization } from './services/emsService';
-import { liveTelemetry } from './services/telemetryStore';
-
-import pool from './db';
 
 app.get('/api/dashboard', async (req: Request, res: Response) => {
   try {
@@ -140,9 +142,6 @@ app.get('/api/telemetry-history', async (req: Request, res: Response) => {
 });
 
 
-import { getSpineDevices, configureSpineApi, getPowerSequence, getPowerTimeSlot, syncAllDevices } from './services/spineService';
-
-
 app.get('/api/features/powerSequence', async (req: Request, res: Response) => {
   try {
     const { deviceId } = req.query;
@@ -159,19 +158,19 @@ app.get('/api/features/powerSequence', async (req: Request, res: Response) => {
         startTime: sequenceData.startTime || new Date(sched.scheduled_start).toISOString(),
         endTime: sequenceData.endTime || new Date(sched.scheduled_end).toISOString()
       });
-
     }
 
     res.json(sequenceData);
-app.get('/api/executed-runs', async (req: Request, res: Response) => {
-  try {
-    const result = await pool.query('SELECT * FROM executed_runs ORDER BY id DESC');
-    res.json(result.rows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Fix 1: /api/executed-runs was previously nested inside the powerSequence handler (bug)
+app.get('/api/executed-runs', async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query('SELECT * FROM executed_runs ORDER BY id DESC');
+    res.json(result.rows);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -230,8 +229,6 @@ app.post('/api/spine/configure', async (req: Request, res: Response) => {
   }
 });
 
-import { getApiLogs, addProtocolEntry, getProtocolLog, clearProtocolLog, protocolEmitter } from './services/logService';
-
 app.get('/api/miele/logs', (req: Request, res: Response) => {
   res.json(getApiLogs());
 });
@@ -279,11 +276,8 @@ app.get('/api/spine/protocol-stream', (req: Request, res: Response) => {
   });
 });
 
-import { exchangeCodeForToken, isConnected, disconnectMiele, loadTokensFromDB } from './services/mieleAuthService';
-
 app.post('/api/miele/connect', (req: Request, res: Response) => {
   const clientId = process.env.MIELE_CLIENT_ID || '';
-  const { getConfig } = require('./services/configService');
   const redirectUri = `${getConfig().system.baseUrl}/api/miele/callback`;
   const scope = 'openid mcs_energy_management';
   
@@ -294,7 +288,6 @@ app.post('/api/miele/connect', (req: Request, res: Response) => {
 
 app.get('/api/miele/callback', async (req: Request, res: Response) => {
   const { code, error, error_description } = req.query;
-  const { getConfig } = require('./services/configService');
   const baseUrl = getConfig().system.baseUrl;
   
   if (error) {
@@ -314,7 +307,6 @@ app.get('/api/miele/callback', async (req: Request, res: Response) => {
 });
 
 app.get('/api/miele/status', (req: Request, res: Response) => {
-  const { getAccessToken } = require('./services/mieleAuthService');
   res.json({ connected: isConnected(), token: getAccessToken() });
 });
 
@@ -326,9 +318,7 @@ app.post('/api/miele/disconnect', (req: Request, res: Response) => {
 
 app.post('/api/factory-defaults', async (req: Request, res: Response) => {
   try {
-    const { getAccessToken } = require('./services/mieleAuthService');
     const token = getAccessToken();
-    const axios = require('axios');
     
     if (token) {
       try {
@@ -377,19 +367,21 @@ app.post('/api/factory-defaults', async (req: Request, res: Response) => {
       } catch (bindFetchErr: any) {
         console.error('[server]: Failed to fetch cloud bindings for cleanup:', bindFetchErr.message);
       }
-
     }
 
     await pool.query('TRUNCATE TABLE device_bindings CASCADE');
     await pool.query('TRUNCATE TABLE miele_oauth_tokens CASCADE');
+    await pool.query('TRUNCATE TABLE callback_logs CASCADE');
+    await pool.query('TRUNCATE TABLE dynamic_power_slots CASCADE');
+    await pool.query('TRUNCATE TABLE device_schedules CASCADE');
+    await pool.query('TRUNCATE TABLE executed_runs CASCADE');
     
-    const { clearBoundDevices } = require('./services/spineService');
-    const { clearApiLogs } = require('./services/logService');
     clearBoundDevices();
     clearApiLogs();
+    clearProtocolLog();
 
     disconnectMiele();
-    console.log('[server]: Factory defaults executed.');
+    console.log('[server]: Factory defaults executed. All local device data, schedules, and logs cleared.');
     res.json({ success: true, message: 'Factory defaults executed successfully.' });
   } catch (err: any) {
     console.error('[server]: Factory reset failed:', err.message);
@@ -397,15 +389,17 @@ app.post('/api/factory-defaults', async (req: Request, res: Response) => {
   }
 });
 
-import { getAccessToken } from './services/mieleAuthService';
-import { addApiLog } from './services/logService';
-import axios from 'axios';
 
 app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     console.log(`[server]: Manually starting device ${id} now.`);
     
+    const authorizedIds = getAuthorizedDeviceIds();
+    if (authorizedIds && authorizedIds.length > 0 && !authorizedIds.includes(id as string)) {
+      return res.status(403).json({ error: `Device ${id} is not authorized in current OAuth token.` });
+    }
+
     const seqData = await getPowerSequence(id as string);
     const sequenceId = seqData?.sequenceId ?? 0;
 
@@ -432,7 +426,7 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
       }
     });
 
-    addApiLog('POST', '/usecaseInterfaces/flexibleStartForWhiteGoods/v1', {
+    addApiLog('POST', '/v1/usecaseInterfaces/flexibleStartForWhiteGoods/v1', {
       statusCode: response.status,
       requestPayload: payload,
       responsePayload: response.data
@@ -440,8 +434,7 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
     addProtocolEntry({ direction: 'IN', category: 'command', method: 'POST', endpoint: '/v1/usecaseInterfaces/flexibleStartForWhiteGoods/v1', deviceId: id as string, statusCode: response.status, responsePayload: response.data });
 
     try {
-      const { getPowerTimeSlot } = require('./services/spineService');
-      const slotsData = await getPowerTimeSlot(id);
+      const slotsData = await getPowerTimeSlot(String(id));
       await pool.query(
         "INSERT INTO executed_runs (device_id, device_name, start_time, profile_slots) VALUES ($1, $2, $3, $4)",
         [id, 'Miele Device', startTime, JSON.stringify(slotsData?.slots || [])]
@@ -455,7 +448,7 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
 
   } catch (err: any) {
     console.error('[server]: Failed to send start command to Miele Cloud:', err.response?.data || err.message);
-    addApiLog('POST', '/usecaseInterfaces/flexibleStartForWhiteGoods/v1 [ERROR]', {
+    addApiLog('POST', '/v1/usecaseInterfaces/flexibleStartForWhiteGoods/v1 [ERROR]', {
       statusCode: err.response?.status || 500,
       error: err.response?.data || err.message
     });
@@ -466,18 +459,24 @@ app.post('/api/devices/:id/start', async (req: Request, res: Response) => {
 app.post('/api/spine/callback', async (req: Request, res: Response) => {
   try {
     const payload = req.body;
-    // Use existing API Log facility
-    const { addApiLog } = require('./services/logService');
-
     addApiLog('POST', '/api/spine/callback', payload);
     console.log('[spineCallback]: Received webhook:', JSON.stringify(payload));
 
     if (Array.isArray(payload)) {
       for (const item of payload) {
+        const devId = item.deviceId || (item.feature && item.feature.deviceId);
+        // Fix 4: Truncate featType to match VARCHAR(50) DB column limit
+        const featTypeRaw = item.featureObjType || (item.feature && item.feature.featureObjType) || 'unknown';
+        const featType = String(featTypeRaw).substring(0, 50);
+
+        const authorizedIds = getAuthorizedDeviceIds();
+        if (authorizedIds && authorizedIds.length > 0 && devId && !authorizedIds.includes(devId)) {
+          console.log(`[spineCallback]: Skipping callback for non-authorized device ${devId}`);
+          continue;
+        }
+
         // Persist callback to DB for audit
         try {
-          const devId = item.deviceId || (item.feature && item.feature.deviceId);
-          const featType = item.featureObjType || (item.feature && item.feature.featureObjType) || 'unknown';
           await pool.query(
             'INSERT INTO callback_logs (device_id, feature_type, payload) VALUES ($1, $2, $3)',
             [devId, featType, JSON.stringify(item)]
@@ -506,10 +505,11 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
                [newState, seq.data.startTime, seq.data.endTime, seq.data.earliestStartTime, seq.data.latestEndTime, deviceId]
              );
              console.log(`[spineCallback]: Updated ${deviceId} to ${newState}`);
+             // Fix 3: Invalidate device cache so next dashboard load gets fresh cloud data
+             invalidateDeviceCache();
 
              if (newState === 'SCHEDULED' || newState === 'RUNNING') {
                try {
-                 const { getPowerTimeSlot } = require('./services/spineService');
                  const slotsData = await getPowerTimeSlot(deviceId);
                  console.log(`[spineCallback]: Re-read Power Time Slots for ${deviceId}`);
 
@@ -562,7 +562,6 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
                 [deviceId]
               );
               if (existingRun.rows.length === 0) {
-                const { getPowerTimeSlot } = require('./services/spineService');
                 try {
                   const slotsData = await getPowerTimeSlot(deviceId);
                   await pool.query(
@@ -589,7 +588,20 @@ app.post('/api/spine/callback', async (req: Request, res: Response) => {
 app.get('/api/spine/callback-logs', async (req: Request, res: Response) => {
   try {
     const result = await pool.query('SELECT * FROM callback_logs ORDER BY timestamp DESC LIMIT 100');
-    res.json(result.rows);
+    const rows = result.rows.map((r: any) => ({
+      ...r,
+      timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : new Date().toISOString()
+    }));
+    res.json(rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/spine/callback-logs', async (req: Request, res: Response) => {
+  try {
+    await pool.query('TRUNCATE TABLE callback_logs CASCADE');
+    res.json({ success: true, message: 'Callback logs cleared successfully.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -632,7 +644,6 @@ setTimeout(async () => {
   await syncAllDevices();
   await runOptimization();
   connectToHomeAssistant();
-
 }, 5000);
 
 app.listen(Number(PORT), '0.0.0.0', () => {

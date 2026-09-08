@@ -45,6 +45,9 @@ export const initDB = async () => {
         device_id VARCHAR(255) PRIMARY KEY,
         bound_at TIMESTAMPTZ DEFAULT NOW(),
         binding_id VARCHAR(255),
+        -- NOTE: expires_at is stored as VARCHAR because the Miele API sometimes returns
+        -- non-ISO strings like 'Unlimited'. A migration to TIMESTAMPTZ requires
+        -- normalization of these values first (treat 'Unlimited'/null as far-future date).
         expires_at VARCHAR(255)
       );
       ALTER TABLE device_bindings ADD COLUMN IF NOT EXISTS binding_id VARCHAR(255);

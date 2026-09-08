@@ -1248,19 +1248,26 @@ function App() {
               
               {!isLogsDetached ? (
                 <div style={{ maxHeight: '150px', overflowY: 'auto', background: '#0f172a', color: '#f1f5f9', padding: '0.75rem', borderRadius: '0.5rem', fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                  {apiLogs.map(log => (
-                    <div key={log.id} style={{ marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                      <span style={{ color: '#60a5fa' }}>[{new Date(log.timestamp).toLocaleTimeString()}] </span>
-                      <span style={{ color: '#34d399', fontWeight: 'bold' }}>{log.method} </span>
-                      <span style={{ color: '#fbbf24' }}>{log.endpoint}</span>
-                      <details style={{ marginTop: '0.25rem', color: '#94a3b8' }}>
-                        <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: '#38bdf8' }}>View Payload</summary>
-                        <pre style={{ marginTop: '0.25rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.75rem', background: '#1e293b', color: '#e2e8f0', padding: '0.5rem', borderRadius: '0.25rem' }}>
-                          {log.response}
-                        </pre>
-                      </details>
-                    </div>
-                  ))}
+                  {apiLogs.filter(log => log.method !== 'STORY').map(log => {
+                    const d = new Date(log.timestamp);
+                    const timeStr = !isNaN(d.getTime()) 
+                      ? `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+                      : String(log.timestamp);
+
+                    return (
+                      <div key={log.id} style={{ marginBottom: '0.5rem', paddingBottom: '0.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span style={{ color: '#60a5fa' }}>[{timeStr}] </span>
+                        <span style={{ color: '#34d399', fontWeight: 'bold' }}>{log.method} </span>
+                        <span style={{ color: '#fbbf24' }}>{log.endpoint}</span>
+                        <details style={{ marginTop: '0.25rem', color: '#94a3b8' }}>
+                          <summary style={{ cursor: 'pointer', fontSize: '0.75rem', color: '#38bdf8' }}>View Payload</summary>
+                          <pre style={{ marginTop: '0.25rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: '0.75rem', background: '#1e293b', color: '#e2e8f0', padding: '0.5rem', borderRadius: '0.25rem' }}>
+                            {log.response}
+                          </pre>
+                        </details>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic', margin: '0.5rem 0' }}>

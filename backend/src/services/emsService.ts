@@ -114,8 +114,11 @@ const calculateSlotCost = (start: Date, end: Date, prices: any[], solar: any[], 
     totalCost -= (totalSolarWattHours / 1000) * 50; 
   }
 
-  // 4. Prioritize early completion for Dishwasher
-  const isDW = device.name.toLowerCase().includes('dishwasher') || device.name.toLowerCase().includes('spülmaschine');
+  // Fix 10: Use device.type for dishwasher detection instead of matching on device.name
+  // (name can vary by language or Miele product variant; type is normalized from the API)
+  const isDW = device.type?.toUpperCase().includes('DISHWASHER') ||
+    device.name.toLowerCase().includes('dishwasher') ||
+    device.name.toLowerCase().includes('spülmaschine');
   if (isDW) {
     const waitHours = (start.getTime() - Date.now()) / (1000 * 60 * 60);
     totalCost += waitHours * 15; 

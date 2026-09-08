@@ -15,7 +15,7 @@ export interface SpineDevice {
 
 
 
-import { getAccessToken } from './mieleAuthService';
+import { getAccessToken, getAuthorizedDeviceIds } from './mieleAuthService';
 import axios from 'axios';
 
 const boundDevices = new Set<string>();
@@ -30,6 +30,17 @@ export const clearBoundDevices = () => {
   subscribedDevices.clear();
   cachedDevices = [];
   cacheTimestamp = 0;
+};
+
+/**
+ * Fix 3: Invalidate the in-memory device cache.
+ * Called after a webhook callback changes device state so the next
+ * dashboard refresh fetches fresh data from the cloud.
+ */
+export const invalidateDeviceCache = () => {
+  cachedDevices = [];
+  cacheTimestamp = 0;
+  console.log('[spineService]: Device cache invalidated (triggered by webhook callback).');
 };
 
 
@@ -65,7 +76,7 @@ export const getSpineDevices = async () => {
       }
     });
 
-    addApiLog('GET', '/devices', response.data);
+    addApiLog('GET', '/v1/devices', response.data);
     addProtocolEntry({ direction: 'IN', category: 'query', method: 'GET', endpoint: '/v1/devices', statusCode: response.status, responsePayload: response.data });
 
     // Map Miele payload to SpineDevice
@@ -93,6 +104,15 @@ export const getSpineDevices = async () => {
           powerConsumptionW: 0,
         };
       });
+    }
+
+    // Filter strictly by authorized device IDs from token claims (per customer authorization)
+    const authorizedIds = getAuthorizedDeviceIds();
+    if (authorizedIds && authorizedIds.length > 0) {
+      const allowedSet = new Set(authorizedIds);
+      const originalCount = liveDevices.length;
+      liveDevices = liveDevices.filter(dev => allowedSet.has(dev.id));
+      console.log(`[spineService]: Filtered ${originalCount} cloud devices to ${liveDevices.length} authorized devices from token (${authorizedIds.join(', ')})`);
     }
 
     // Ensure all discovered devices are bound to this EMS
@@ -127,7 +147,7 @@ export const getSpineDevices = async () => {
           });
           
           console.log(`[spineService]: Successfully bound device ${dev.id}`);
-          addApiLog('POST', '/bindings', {
+          addApiLog('POST', '/v1/bindings', {
             statusCode: bindRes.status,
             requestPayload: payload,
             responsePayload: bindRes.data
@@ -140,7 +160,7 @@ export const getSpineDevices = async () => {
           
         } catch (bindError: any) {
           console.error(`[spineService]: Failed to bind device ${dev.id}:`, bindError.response?.data || bindError.message);
-          addApiLog('POST', '/bindings [ERROR]', {
+          addApiLog('POST', '/v1/bindings [ERROR]', {
             statusCode: bindError.response?.status || 500,
             requestPayload: { deviceId: dev.id },
             error: bindError.response?.data || bindError.message
@@ -177,7 +197,7 @@ export const getSpineDevices = async () => {
           });
           console.log(`[spineService]: Successfully created subscription for ${dev.id}`);
           subscribedDevices.add(dev.id);
-          addApiLog('POST', '/subscriptions', {
+          addApiLog('POST', '/v1/subscriptions', {
             statusCode: subRes.status,
             requestPayload: subPayload,
             responsePayload: subRes.data
@@ -185,7 +205,7 @@ export const getSpineDevices = async () => {
           addProtocolEntry({ direction: 'IN', category: 'subscription', method: 'POST', endpoint: '/v1/subscriptions', deviceId: dev.id, statusCode: subRes.status, responsePayload: subRes.data });
         } catch (subErr: any) {
           console.error(`[spineService]: Failed to subscribe device ${dev.id}:`, subErr.response?.data || subErr.message);
-          addApiLog('POST', '/subscriptions [ERROR]', {
+          addApiLog('POST', '/v1/subscriptions [ERROR]', {
             statusCode: subErr.response?.status || 500,
             error: subErr.response?.data || subErr.message
           });
@@ -204,36 +224,58 @@ export const getSpineDevices = async () => {
         bindingMap.set(row.device_id, { bindingId: row.binding_id, expires: row.expires_at });
       });
 
+      addProtocolEntry({ direction: 'OUT', category: 'binding', method: 'GET', endpoint: '/v1/bindings', requestPayload: null });
       const bindingsRes = await axios.get('https://ems.domestic.miele-iot.com/v1/bindings', {
         headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       });
+      addApiLog('GET', '/v1/bindings', bindingsRes.data);
+      addProtocolEntry({ direction: 'IN', category: 'binding', method: 'GET', endpoint: '/v1/bindings', statusCode: bindingsRes.status, responsePayload: bindingsRes.data });
       const cloudBindings = Array.isArray(bindingsRes.data) ? bindingsRes.data : [];
 
+      addProtocolEntry({ direction: 'OUT', category: 'subscription', method: 'GET', endpoint: '/v1/subscriptions', requestPayload: null });
       const subsRes = await axios.get('https://ems.domestic.miele-iot.com/v1/subscriptions', {
         headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       });
+      addApiLog('GET', '/v1/subscriptions', subsRes.data);
+      addProtocolEntry({ direction: 'IN', category: 'subscription', method: 'GET', endpoint: '/v1/subscriptions', statusCode: subsRes.status, responsePayload: subsRes.data });
       const cloudSubs = Array.isArray(subsRes.data) ? subsRes.data : [];
+
+      // Fix 6: Match bindings and subscriptions by deviceId, not by array index.
+      // Index-based matching was fragile: if the cloud reorders results, wrong IDs would be assigned.
+      const bindingByDeviceId = new Map<string, any>();
+      for (const b of cloudBindings) {
+        const bDevId = b.deviceId || b.usecaseInterfaces?.deviceId;
+        if (bDevId) bindingByDeviceId.set(String(bDevId), b);
+      }
+
+      const subByDeviceId = new Map<string, any>();
+      for (const s of cloudSubs) {
+        const sDevId = s.deviceId || s.usecaseInterfaces?.deviceId;
+        if (sDevId) subByDeviceId.set(String(sDevId), s);
+      }
 
       for (let i = 0; i < liveDevices.length; i++) {
         const dev = liveDevices[i];
         
-        // Map Binding ID
+        // Map Binding ID – prefer local DB, then cloud match by deviceId
         if (bindingMap.has(dev.id) && bindingMap.get(dev.id).bindingId && bindingMap.get(dev.id).bindingId !== 'N/A') {
           const data = bindingMap.get(dev.id);
           dev.bindingId = data.bindingId;
           dev.validUntil = data.expires;
-        } else if (cloudBindings[i]) {
-          dev.bindingId = cloudBindings[i].bindingId || cloudBindings[i].id || 'N/A';
-          dev.validUntil = cloudBindings[i].expires || 'Unlimited';
+        } else if (bindingByDeviceId.has(dev.id)) {
+          const cloudBinding = bindingByDeviceId.get(dev.id);
+          dev.bindingId = cloudBinding.bindingId || cloudBinding.id || 'N/A';
+          dev.validUntil = cloudBinding.expires || 'Unlimited';
           await pool.query('INSERT INTO device_bindings (device_id, binding_id, expires_at) VALUES ($1, $2, $3) ON CONFLICT (device_id) DO UPDATE SET binding_id = EXCLUDED.binding_id, expires_at = EXCLUDED.expires_at', [dev.id, dev.bindingId, dev.validUntil]);
         } else {
           dev.bindingId = 'Pending / None';
           dev.validUntil = 'N/A';
         }
 
-        // Map Subscription ID
-        if (cloudSubs[i]) {
-          dev.subscriptionId = cloudSubs[i].subscriptionId || cloudSubs[i].id || 'N/A';
+        // Map Subscription ID by deviceId
+        if (subByDeviceId.has(dev.id)) {
+          const cloudSub = subByDeviceId.get(dev.id);
+          dev.subscriptionId = cloudSub.subscriptionId || cloudSub.id || 'N/A';
         } else {
           dev.subscriptionId = 'Pending / None';
         }
@@ -260,6 +302,12 @@ export const getPowerSequence = async (deviceId: string, currentStatus?: string)
   
   // If the device is definitively INACTIVE or OFF, we don't want to show any ghost schedules.
   if (status === 'inactive' || status === 'off' || status === 'not_connected') {
+    return { state: 'inactive' };
+  }
+
+  // Check if device is authorized in current token
+  const authorizedIds = getAuthorizedDeviceIds();
+  if (authorizedIds && authorizedIds.length > 0 && !authorizedIds.includes(deviceId)) {
     return { state: 'inactive' };
   }
 
@@ -290,6 +338,7 @@ export const getPowerSequence = async (deviceId: string, currentStatus?: string)
   console.log(`[spineService]: Requesting ground truth from Miele Cloud for ${deviceId}...`);
 
   try {
+    addProtocolEntry({ direction: 'OUT', category: 'query', method: 'GET', endpoint: `/v1/features/powerSequence?deviceId=${deviceId}`, deviceId, featureType: 'powerSequence', requestPayload: null });
     const response = await axios.get(`https://ems.domestic.miele-iot.com/v1/features/powerSequence?deviceId=${deviceId}`, {
       headers: {
         'Authorization': `Bearer ${token || 'mock-token-poc'}`,
@@ -297,7 +346,8 @@ export const getPowerSequence = async (deviceId: string, currentStatus?: string)
       }
     });
 
-    addApiLog('GET', `/features/powerSequence?deviceId=${deviceId}`, response.data);
+    addApiLog('GET', `/v1/features/powerSequence?deviceId=${deviceId}`, response.data);
+    addProtocolEntry({ direction: 'IN', category: 'query', method: 'GET', endpoint: `/v1/features/powerSequence?deviceId=${deviceId}`, deviceId, featureType: 'powerSequence', statusCode: response.status, responsePayload: response.data });
     if (Array.isArray(response.data)) {
       const seqObj = response.data.find((item: any) => item.deviceId === deviceId);
       const data = seqObj ? seqObj.data : null;
@@ -327,6 +377,8 @@ export const getPowerSequence = async (deviceId: string, currentStatus?: string)
     return data;
   } catch (error: any) {
     console.error(`[spineService]: Failed to fetch power sequence for ${deviceId}:`, error.response?.data || error.message);
+    addApiLog('GET', `/v1/features/powerSequence?deviceId=${deviceId} [ERROR]`, error.response?.data || error.message);
+    addProtocolEntry({ direction: 'IN', category: 'query', method: 'GET', endpoint: `/v1/features/powerSequence?deviceId=${deviceId}`, deviceId, featureType: 'powerSequence', statusCode: error.response?.status || 500, errorMessage: error.response?.data ? JSON.stringify(error.response.data) : error.message });
     throw new Error(`Failed to fetch power sequence for ${deviceId}: ${error.response?.data ? JSON.stringify(error.response.data) : error.message}`);
   }
 };
@@ -351,6 +403,12 @@ const iso8601ToMinutes = (duration: string): number => {
 };
 
 export const refreshPowerTimeSlots = async (deviceId: string) => {
+  // Check if device is authorized in current token
+  const authorizedIds = getAuthorizedDeviceIds();
+  if (authorizedIds && authorizedIds.length > 0 && !authorizedIds.includes(deviceId)) {
+    return;
+  }
+
   // First check if we already have slots to avoid redundant cloud calls
   try {
     const check = await pool.query('SELECT 1 FROM dynamic_power_slots WHERE device_id = $1 LIMIT 1', [deviceId]);
@@ -361,12 +419,16 @@ export const refreshPowerTimeSlots = async (deviceId: string) => {
   console.log(`[spineService]: Refreshing and persisting power slots for ${deviceId}...`);
 
   try {
+    addProtocolEntry({ direction: 'OUT', category: 'query', method: 'GET', endpoint: `/v1/features/powerTimeSlot?deviceId=${deviceId}`, deviceId, featureType: 'powerTimeSlot', requestPayload: null });
     const response = await axios.get(`https://ems.domestic.miele-iot.com/v1/features/powerTimeSlot?deviceId=${deviceId}`, {
       headers: {
         'Authorization': `Bearer ${token || 'mock-token-poc'}`,
         'Accept': 'application/json',
       }
     });
+
+    addApiLog('GET', `/v1/features/powerTimeSlot?deviceId=${deviceId}`, response.data);
+    addProtocolEntry({ direction: 'IN', category: 'query', method: 'GET', endpoint: `/v1/features/powerTimeSlot?deviceId=${deviceId}`, deviceId, featureType: 'powerTimeSlot', statusCode: response.status, responsePayload: response.data });
 
     // Miele API returns a flat array of feature objects based on the user's provided JSON
     const features = Array.isArray(response.data) ? response.data : [];
@@ -394,6 +456,8 @@ export const refreshPowerTimeSlots = async (deviceId: string) => {
     }
   } catch (error: any) {
     console.error(`[spineService]: Failed to refresh power slots for ${deviceId}:`, error.message);
+    addApiLog('GET', `/v1/features/powerTimeSlot?deviceId=${deviceId} [ERROR]`, error.response?.data || error.message);
+    addProtocolEntry({ direction: 'IN', category: 'query', method: 'GET', endpoint: `/v1/features/powerTimeSlot?deviceId=${deviceId}`, deviceId, featureType: 'powerTimeSlot', statusCode: error.response?.status || 500, errorMessage: error.response?.data ? JSON.stringify(error.response.data) : error.message });
   }
 };
 
@@ -441,39 +505,29 @@ export const syncAllDevices = async () => {
         break;
       }
 
-      // 1. Sync Power Sequence
-      const seqRes = await axios.get(`https://ems.domestic.miele-iot.com/v1/features/powerSequence?deviceId=${device.id}`, {
-        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-      }).catch(() => null);
+      // Fix 5: Use getPowerSequence() instead of a direct axios call so that
+      // all cloud interactions are logged in the Protocol Inspector consistently.
+      const seq = await getPowerSequence(device.id, device.status).catch(() => null);
 
-      if (seqRes && seqRes.data) {
-        // Handle both single object and array responses
-        let seq = seqRes.data;
-        if (Array.isArray(seq)) {
-          const item = seq.find((i: any) => i.deviceId === device.id);
-          seq = item ? item.data : null;
-        }
+      if (seq && typeof seq === 'object' && seq.state) {
+        const newState = (seq.state || 'READY').toUpperCase();
+        const startTime = seq.startTime || null;
+        const endTime = seq.endTime || null;
+        const earliest = seq.earliestStartTime || null;
+        const latest = seq.latestEndTime || null;
 
-        if (seq) {
-          let newState = seq.state?.toUpperCase() || 'READY';
-          const startTime = seq.startTime || null;
-          const endTime = seq.endTime || null;
-          const earliest = seq.earliestStartTime || null;
-          const latest = seq.latestEndTime || null;
+        await pool.query(
+          'INSERT INTO device_schedules (device_id, device_name, scheduled_start, scheduled_end, earliest_start, latest_end, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [device.id, device.name, startTime, endTime, earliest, latest, newState]
+        );
+        console.log(`[spineService]: Synced sequence for ${device.name}: ${newState}`);
 
-          await pool.query(
-            'INSERT INTO device_schedules (device_id, device_name, scheduled_start, scheduled_end, earliest_start, latest_end, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-            [device.id, device.name, startTime, endTime, earliest, latest, newState]
-          );
-          console.log(`[spineService]: Synced sequence for ${device.name}: ${newState}`);
-
-          // NEW: Also sync Power Time Slots for accurate chart/tooltip rendering
-          try {
-            await getPowerTimeSlot(device.id);
-            console.log(`[spineService]: Synced power slots for ${device.name}`);
-          } catch (slotErr) {
-            console.error(`[spineService]: Failed to sync power slots for ${device.name}`);
-          }
+        // Also sync Power Time Slots for accurate chart/tooltip rendering
+        try {
+          await getPowerTimeSlot(device.id);
+          console.log(`[spineService]: Synced power slots for ${device.name}`);
+        } catch (slotErr) {
+          console.error(`[spineService]: Failed to sync power slots for ${device.name}`);
         }
       }
     } catch (err: any) {

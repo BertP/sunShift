@@ -153,7 +153,19 @@ function ProtocolEntryCard({ entry, isNew }: { entry: ProtocolEntry; isNew: bool
             {entry.statusCode}
           </span>
         )}
-        <span style={{ fontSize: '0.63rem', color: '#475569', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+        <span style={{
+          fontSize: '0.74rem',
+          fontWeight: 600,
+          color: '#cbd5e1',
+          background: 'rgba(15, 23, 42, 0.75)',
+          padding: '0.15rem 0.45rem',
+          borderRadius: '4px',
+          border: '1px solid rgba(255, 255, 255, 0.12)',
+          whiteSpace: 'nowrap',
+          fontFamily: 'monospace',
+          letterSpacing: '0.02em',
+          marginLeft: 'auto'
+        }}>
           {(() => {
             const d = new Date(entry.timestamp);
             const hh = String(d.getHours()).padStart(2, '0');

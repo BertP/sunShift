@@ -32,13 +32,13 @@ protocolEmitter.setMaxListeners(50);
 
 export const addApiLog = (method: string, endpoint: string, responseData: any) => {
   logs.unshift({
-    id: String(Math.random()),
+    id: `${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
     timestamp: new Date().toISOString(),
     method,
     endpoint,
-    response: JSON.stringify(responseData, null, 2)
+    response: typeof responseData === 'string' ? responseData : JSON.stringify(responseData, null, 2)
   });
-  if (logs.length > 30) {
+  if (logs.length > 100) {
     logs.pop();
   }
 };
@@ -67,7 +67,7 @@ export const getApiLogs = () => logs;
 
 export const clearApiLogs = () => {
   logs = [];
-  protocolLog = [];
-  protocolEmitter.emit('clear');
+  // NOTE: protocolLog is intentionally NOT cleared here.
+  // Use clearProtocolLog() to reset the SPINE/EEBUS protocol inspector.
 };
 
